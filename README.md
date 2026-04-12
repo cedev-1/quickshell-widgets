@@ -20,8 +20,6 @@ Options:
 
 <img width="967" height="712" alt="image" src="https://github.com/user-attachments/assets/b4148b26-4af6-4a5b-9150-6787e07e367c" />
 
-
-
 ## Sources
 
 https://github.com/caelestia-dots/shell/blob/main/modules/background/DesktopClock.qml
