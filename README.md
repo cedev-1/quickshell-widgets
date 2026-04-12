@@ -6,7 +6,7 @@ Desktop clock widget using Quickshell. Originally from [Caelestia](https://githu
 
 ```nix
 {
-  inputs.quickshell-clock-widget.url = "github:cedev/quickshell-clock-widget";
+  inputs.quickshell-clock-widget.url = "github:cedev-1/quickshell-clock-widget";
   
   imports = [ inputs.quickshell-clock-widget.nixosModules.default ];
   
