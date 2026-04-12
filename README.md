@@ -17,3 +17,5 @@ Desktop clock widget using Quickshell. Originally from [Caelestia](https://githu
 Options:
 - `position` - Widget position: `bottom-right` (default), `bottom-left`, `top-right`, `top-left`, `center`
 - `fontSize` - Font size in pixels (default: 84)
+
+<img width="967" height="712" alt="image" src="https://github.com/user-attachments/assets/b4148b26-4af6-4a5b-9150-6787e07e367c" />
