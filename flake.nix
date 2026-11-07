@@ -43,6 +43,12 @@
           default = "bottom-right";
           description = "Widget position on the screen";
         };
+        screens = mkOption {
+          type = types.listOf types.str;
+          default = [ ];
+          example = [ "DP-1" "HDMI-A-1" ];
+          description = "Monitor names to show the widget on (see `hyprctl monitors`). Empty means all screens.";
+        };
         fontSize = mkOption {
           type = types.ints.unsigned;
           default = 84;
@@ -62,6 +68,7 @@
           environment = {
             CLOCK_POSITION = cfg.position;
             CLOCK_FONT_SIZE = toString cfg.fontSize;
+            CLOCK_SCREENS = lib.concatStringsSep "," cfg.screens;
           };
           serviceConfig = {
             ExecStart = "${pkgs.quickshell}/bin/quickshell -p ${mkConfig pkgs}";

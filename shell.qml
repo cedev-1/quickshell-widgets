@@ -9,9 +9,21 @@ ShellRoot {
     // Set by the NixOS module through environment variables
     readonly property string position: Quickshell.env("CLOCK_POSITION") || "bottom-right"
     readonly property int fontSize: parseInt(Quickshell.env("CLOCK_FONT_SIZE")) || 84
+    // Comma separated monitor names (e.g. "DP-1,HDMI-A-1"), empty = all screens
+    readonly property var screenNames: (Quickshell.env("CLOCK_SCREENS") || "").split(",").filter(n => n.length > 0)
+
+    readonly property var targetScreens: {
+        var out = [];
+        for (var i = 0; i < Quickshell.screens.length; i++) {
+            var s = Quickshell.screens[i];
+            if (screenNames.length === 0 || screenNames.indexOf(s.name) >= 0)
+                out.push(s);
+        }
+        return out;
+    }
 
     Variants {
-        model: Quickshell.screens
+        model: targetScreens
 
         delegate: PanelWindow {
             required property var modelData

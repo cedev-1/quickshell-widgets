@@ -41,6 +41,7 @@ services.quickshell-clock-widget = {
   enable = true;
   position = "bottom-right";
   fontSize = 84;
+  screens = [ "HDMI-A-1" ]; # omit for all screens
 };
 ```
 
@@ -51,6 +52,7 @@ Check it with `systemctl --user status quickshell-clock-widget`.
 Options:
 - `position` - Widget position: `bottom-right` (default), `bottom-left`, `top-right`, `top-left`, `center`
 - `fontSize` - Size of the clock digits (default: 84). The date and day text scale proportionally.
+- `screens` - List of monitor names to show the widget on, e.g. `[ "HDMI-A-1" ]` (find them with `hyprctl monitors`). Empty (default) means all screens.
 
 <img width="967" height="712" alt="image" src="https://github.com/user-attachments/assets/b4148b26-4af6-4a5b-9150-6787e07e367c" />
 
