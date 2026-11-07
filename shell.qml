@@ -2,17 +2,19 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
-import QtQuick.Layouts
 import Quickshell
 import Quickshell.Wayland
-import Quickshell.Io
 
 ShellRoot {
+    // Set by the NixOS module through environment variables
+    readonly property string position: Quickshell.env("CLOCK_POSITION") || "bottom-right"
+    readonly property int fontSize: parseInt(Quickshell.env("CLOCK_FONT_SIZE")) || 84
+
     Variants {
         model: Quickshell.screens
 
         delegate: PanelWindow {
-            property var modelData
+            required property var modelData
 
             screen: modelData
             anchors {
@@ -27,18 +29,19 @@ ShellRoot {
             WlrLayershell.layer: WlrLayer.Bottom
             WlrLayershell.exclusionMode: ExclusionMode.Ignore
 
-            Row {
-                anchors {
-                    right: parent.right
-                    bottom: parent.bottom
-                }
-                x: -30
-                y: -30
-                spacing: 30
+            DesktopClock {
+                id: clock
+                clockScale: fontSize / 84
+                bgEnabled: false
 
-                DesktopClock {
-                    clockScale: 1.0
-                    bgEnabled: false
+                readonly property bool isCenter: position === "center"
+                anchors {
+                    margins: 30
+                    centerIn: isCenter ? parent : undefined
+                    left: !isCenter && position.endsWith("left") ? parent.left : undefined
+                    right: !isCenter && position.endsWith("right") ? parent.right : undefined
+                    top: !isCenter && position.startsWith("top") ? parent.top : undefined
+                    bottom: !isCenter && position.startsWith("bottom") ? parent.bottom : undefined
                 }
             }
         }
