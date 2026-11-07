@@ -18,6 +18,9 @@
     packages = forAllSystems (system:
     let pkgs = nixpkgs.legacyPackages.${system}; in {
       config = mkConfig pkgs;
+      lock = pkgs.writeShellScriptBin "quickshell-lock" ''
+        exec ${pkgs.quickshell}/bin/quickshell ipc -p ${mkConfig pkgs} call lock lock
+      '';
       default = pkgs.writeShellScriptBin "quickshell-widgets" ''
         export PATH=${pkgs.lib.makeBinPath [ pkgs.coreutils pkgs.bash ]}:$PATH
         exec ${pkgs.quickshell}/bin/quickshell -p ${mkConfig pkgs} "$@"
@@ -48,7 +51,7 @@
         description = "Monitors for this component (see `hyprctl monitors`). Empty means the global `screens` option.";
       };
 
-      enabled = lib.filter (name: cfg.${name}.enable) [ "clock" "stats" "header" ];
+      enabled = lib.filter (name: cfg.${name}.enable) [ "clock" "stats" "header" "lock" ];
       csv = lib.concatStringsSep ",";
     in {
       options.services.quickshell-widgets = with lib; {
@@ -122,10 +125,38 @@
           };
           screens = screensOption;
         };
+
+        lock = {
+          enable = mkEnableOption "the lock screen (trigger it with the quickshell-lock command)";
+          wallpaper = mkOption {
+            type = types.nullOr types.path;
+            default = null;
+            example = literalExpression "./wall.png";
+            description = "Image used as the lock screen background. Empty means a black background.";
+          };
+          blur = mkOption {
+            type = types.bool;
+            default = true;
+            description = "Blur the wallpaper";
+          };
+          rounding = mkOption {
+            type = types.ints.unsigned;
+            default = 10;
+            description = "Corner radius of the password field in pixels";
+          };
+          font = mkOption {
+            type = types.str;
+            default = "JetBrainsMono Nerd Font";
+            description = "Font family used on the lock screen";
+          };
+        };
       };
 
       config = lib.mkIf cfg.enable {
-        environment.systemPackages = [ pkgs.quickshell ];
+        environment.systemPackages = [ pkgs.quickshell ]
+          ++ lib.optional cfg.lock.enable self.packages.${pkgs.stdenv.hostPlatform.system}.lock;
+
+        security.pam.services.quickshell-lock = lib.mkIf cfg.lock.enable { };
 
         systemd.user.services.quickshell-widgets = {
           description = "Quickshell widgets";
@@ -154,6 +185,11 @@
             HEADER_RADIUS = toString cfg.header.rounding;
             HEADER_FONT = cfg.header.font;
             HEADER_SCREENS = csv cfg.header.screens;
+
+            LOCK_WALLPAPER = lib.optionalString (cfg.lock.wallpaper != null) "${cfg.lock.wallpaper}";
+            LOCK_BLUR = if cfg.lock.blur then "1" else "0";
+            LOCK_RADIUS = toString cfg.lock.rounding;
+            LOCK_FONT = cfg.lock.font;
           };
           serviceConfig = {
             ExecStart = "${pkgs.quickshell}/bin/quickshell -p ${mkConfig pkgs}";

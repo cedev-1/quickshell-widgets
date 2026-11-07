@@ -78,4 +78,17 @@ ShellRoot {
             fontFamily: root.text("HEADER_FONT", "JetBrainsMono Nerd Font")
         }
     }
+
+    LazyLoader {
+        active: root.components.indexOf("lock") >= 0
+
+        Lock {
+            wallpaper: root.text("LOCK_WALLPAPER", "")
+            blur: root.text("LOCK_BLUR", "1") !== "0"
+            cornerRadius: root.number("LOCK_RADIUS", 10)
+            fontFamily: root.text("LOCK_FONT", "JetBrainsMono Nerd Font")
+            pamConfig: root.text("LOCK_PAM", "quickshell-lock")
+            autoUnlock: root.number("LOCK_AUTOUNLOCK", 0)
+        }
+    }
 }

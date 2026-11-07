@@ -5,6 +5,7 @@ Quickshell components for Hyprland on NixOS, all in one flake. Enable only the o
 - **clock**: desktop clock. Originally from [Caelestia](https://github.com/caelestia-dots/shell), extracted without extra dependencies.
 - **stats**: CPU (with temperature), RAM, disk and optional NVIDIA GPU/VRAM, read from `/proc`, `df`, `/sys/class/hwmon` and `nvidia-smi`.
 - **header**: floating header with three rounded islands: active window title, workspaces and date/time. Requires the Lua dispatch syntax (Hyprland >= 0.55).
+- **lock**: lock screen with a blurred wallpaper, a big clock and a password field (password only, authenticated through PAM). Inspired by the lock screen of Caelestia, without weather, fingerprint or Howdy.
 
 All components run in a single Quickshell process.
 
@@ -63,6 +64,11 @@ services.quickshell-widgets = {
     gpu = true;
   };
 
+  lock = {
+    enable = true;
+    wallpaper = ./wall.png;
+  };
+
   header = {
     enable = true;
     showTitle = false;
@@ -75,6 +81,34 @@ services.quickshell-widgets = {
 The widgets run as a systemd **user** service bound to `graphical-session.target`. If you start Hyprland without UWSM, that target may not be active: enable `programs.hyprland.withUWSM` or add `exec-once = systemctl --user start quickshell-widgets` to your Hyprland config.
 
 Check it with `systemctl --user status quickshell-widgets`.
+
+## Lock screen
+
+Enabling `lock` installs the `quickshell-lock` command and a `quickshell-lock` PAM service. Bind the command to a key, for example in a Lua Hyprland config:
+
+```lua
+hl.bind("SUPER + L", hl.dsp.exec_cmd("quickshell-lock"))
+```
+
+For automatic locking after some idle time, call the same command from `hypridle`.
+
+The lock uses the `ext-session-lock` protocol: if the process crashes, the session stays locked. To recover, switch to a TTY (`Ctrl+Alt+F3`), log in and run `systemctl --user restart quickshell-widgets`, then unlock with your password.
+
+### Testing safely
+
+To try it without risk, run it from a checkout with an automatic unlock after 30 seconds and the standard `login` PAM service. In a first terminal:
+
+```sh
+QS_COMPONENTS=lock LOCK_PAM=login LOCK_AUTOUNLOCK=30 LOCK_WALLPAPER=/path/to/wall.png quickshell -p ./qml
+```
+
+In a second terminal:
+
+```sh
+quickshell ipc -p ./qml call lock lock
+```
+
+`LOCK_AUTOUNLOCK` is meant for testing only and is not exposed as a NixOS option.
 
 ## Options
 
@@ -99,6 +133,12 @@ Every component also has `enable` and `screens` (empty means the global `screens
 - `showTitle` - Show the active window title on the left (default: true)
 - `fontSize` - Text size in pixels (default: 12). The header scales with it.
 - `rounding` - Corner radius in pixels (default: 10)
+- `font` - Font family (default: `JetBrainsMono Nerd Font`)
+
+`lock`:
+- `wallpaper` - Image used as the background (default: none, black background)
+- `blur` - Blur the wallpaper (default: true)
+- `rounding` - Corner radius of the password field in pixels (default: 10)
 - `font` - Font family (default: `JetBrainsMono Nerd Font`)
 
 The CPU temperature is read from the first `k10temp`, `coretemp` or `zenpower` sensor. The header is drawn above windows and reserves screen space, so disable any other bar placed on the same edge.
