@@ -216,6 +216,7 @@ PanelWindow {
         Region { item: notifArea }
         Region { item: launcherArea }
         Region { item: sessionArea }
+        Region { item: outsideArea }
     }
 
     NumberAnimation {
@@ -272,6 +273,21 @@ PanelWindow {
         id: content
 
         anchors.fill: parent
+
+        Item {
+            id: outsideArea
+
+            x: win.holeLeft
+            y: win.edge
+            width: win.usageOpen ? win.holeRight - win.holeLeft : 0
+            height: win.usageOpen ? win.holeBottom - win.edge : 0
+
+            MouseArea {
+                anchors.fill: parent
+                acceptedButtons: Qt.AllButtons
+                onClicked: win.controller.closeUsage()
+            }
+        }
 
         Shape {
             anchors.fill: parent
@@ -339,6 +355,11 @@ PanelWindow {
             height: win.notifEffHeight
             clip: true
             visible: win.notifDepth > 1
+
+            MouseArea {
+                anchors.fill: parent
+                acceptedButtons: Qt.AllButtons
+            }
 
             Column {
                 id: notifColumn
