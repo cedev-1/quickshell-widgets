@@ -11,34 +11,46 @@ Item {
     property string fontFamily: "JetBrainsMono Nerd Font"
     property int cornerRadius: 14
     property string claudeFile: ""
-    property string opencodeDb: ""
+    property string opencodeFile: ""
+    property string opencodeCommand: ""
+    property string opencodeWorkspace: ""
     property bool showClaude: true
     property bool showOpencode: true
-    property int interval: 60000
+    property int interval: 300000
 
     property real nowSeconds: Date.now() / 1000
     property var claude: null
     property var opencode: null
-    property bool opencodeFailed: false
 
-    readonly property var fiveHour: windowState(claude?.five_hour)
-    readonly property var sevenDay: windowState(claude?.seven_day)
+    readonly property var fiveHour: windowState(claude?.five_hour?.used_percentage, claude?.five_hour?.resets_at, false)
+    readonly property var sevenDay: windowState(claude?.seven_day?.used_percentage, claude?.seven_day?.resets_at, false)
+    readonly property var goRolling: goWindow(opencode?.rolling)
+    readonly property var goWeekly: goWindow(opencode?.weekly)
+    readonly property var goMonthly: goWindow(opencode?.monthly)
 
     implicitWidth: 360 * unit
     implicitHeight: column.implicitHeight
 
-    function windowState(w) {
-        if (!w || w.used_percentage === undefined)
+    function windowState(percent, resetsAt, limited) {
+        if (percent === undefined || percent === null)
             return null;
-        var expired = w.resets_at !== undefined && w.resets_at <= nowSeconds;
+        var expired = resetsAt !== undefined && resetsAt !== null && resetsAt <= nowSeconds;
+        var prefix = limited && !expired ? "limit reached  ·  " : "";
         return {
-            percent: expired ? 0 : w.used_percentage,
-            caption: expired ? "window reset" : "resets in " + remaining(w.resets_at)
+            percent: expired ? 0 : percent,
+            caption: expired ? "window reset" : prefix + "resets in " + remaining(resetsAt)
         };
     }
 
+    function goWindow(w) {
+        if (!w || w.percent === undefined)
+            return null;
+        var resets = w.resetsAt ? Date.parse(w.resetsAt) / 1000 : undefined;
+        return windowState(w.percent, resets, w.status === "rate-limited");
+    }
+
     function remaining(resetsAt) {
-        if (resetsAt === undefined)
+        if (resetsAt === undefined || resetsAt === null || isNaN(resetsAt))
             return "?";
         var s = Math.max(0, resetsAt - nowSeconds);
         var d = Math.floor(s / 86400);
@@ -62,78 +74,44 @@ Item {
         return Math.round(s / 86400) + " d ago";
     }
 
-    function tokens(n) {
-        if (n >= 1e9)
-            return (n / 1e9).toFixed(1) + "B";
-        if (n >= 1e6)
-            return (n / 1e6).toFixed(1) + "M";
-        if (n >= 1e3)
-            return (n / 1e3).toFixed(1) + "k";
-        return String(n);
-    }
-
-    function money(n) {
-        return "$" + n.toFixed(2);
-    }
-
-    function parseClaude(text) {
+    function parseJson(text) {
         try {
-            claude = JSON.parse(text);
+            return JSON.parse(text);
         } catch (e) {
-            claude = null;
-        }
-    }
-
-    function parseOpencode(text) {
-        try {
-            var rows = JSON.parse(text);
-            opencode = rows[0];
-            opencodeFailed = false;
-        } catch (e) {
-            opencodeFailed = true;
+            return null;
         }
     }
 
     function refreshOpencode() {
-        if (!showOpencode || opencodeDb === "" || ocProcess.running)
+        if (!showOpencode || opencodeCommand === "" || fetchProcess.running)
             return;
-        var midnight = new Date();
-        midnight.setHours(0, 0, 0, 0);
-        var day = midnight.getTime();
-        var week = Date.now() - 7 * 86400000;
-        var total = "tokens_input + tokens_output + tokens_reasoning";
-        ocProcess.command = ["sqlite3", "-readonly", "-json", opencodeDb,
-            "SELECT " +
-            "COALESCE(SUM(CASE WHEN time_updated >= " + day + " THEN cost END), 0) AS cost_day, " +
-            "COALESCE(SUM(CASE WHEN time_updated >= " + day + " THEN " + total + " END), 0) AS tokens_day, " +
-            "COUNT(CASE WHEN time_updated >= " + day + " THEN 1 END) AS sessions_day, " +
-            "COALESCE(SUM(cost), 0) AS cost_week, " +
-            "COALESCE(SUM(" + total + "), 0) AS tokens_week, " +
-            "COUNT(*) AS sessions_week " +
-            "FROM session WHERE time_updated >= " + week
-        ];
-        ocProcess.running = true;
+        if (opencode && opencode.updated && nowSeconds - opencode.updated < 60 && !opencode.error)
+            return;
+        var command = [opencodeCommand];
+        if (opencodeWorkspace !== "")
+            command.push(opencodeWorkspace);
+        fetchProcess.command = command;
+        fetchProcess.running = true;
     }
 
     FileView {
         path: root.showClaude ? root.claudeFile : ""
         watchChanges: true
         onFileChanged: reload()
-        onLoaded: root.parseClaude(text())
+        onLoaded: root.claude = root.parseJson(text())
         onLoadFailed: root.claude = null
     }
 
+    FileView {
+        path: root.showOpencode ? root.opencodeFile : ""
+        watchChanges: true
+        onFileChanged: reload()
+        onLoaded: root.opencode = root.parseJson(text())
+        onLoadFailed: root.opencode = null
+    }
+
     Process {
-        id: ocProcess
-
-        stdout: StdioCollector {
-            onStreamFinished: root.parseOpencode(text)
-        }
-
-        onExited: code => {
-            if (code !== 0)
-                root.opencodeFailed = true;
-        }
+        id: fetchProcess
     }
 
     Timer {
@@ -148,7 +126,10 @@ Item {
         running: root.showOpencode
         repeat: true
         triggeredOnStart: true
-        onTriggered: root.refreshOpencode()
+        onTriggered: {
+            root.nowSeconds = Date.now() / 1000;
+            root.refreshOpencode();
+        }
     }
 
     component SectionTitle: Text {
@@ -156,6 +137,14 @@ Item {
         font.pixelSize: 11 * root.unit
         font.weight: Font.Bold
         font.letterSpacing: 3
+        color: "#8cffffff"
+    }
+
+    component Note: Text {
+        width: parent.width
+        wrapMode: Text.Wrap
+        font.family: root.fontFamily
+        font.pixelSize: 12 * root.unit
         color: "#8cffffff"
     }
 
@@ -221,35 +210,6 @@ Item {
         }
     }
 
-    component StatLine: Item {
-        id: line
-
-        required property string label
-        required property string value
-
-        implicitWidth: root.implicitWidth
-        implicitHeight: 22 * root.unit
-
-        Text {
-            anchors.left: parent.left
-            anchors.verticalCenter: parent.verticalCenter
-            text: line.label
-            font.family: root.fontFamily
-            font.pixelSize: 13 * root.unit
-            font.weight: Font.DemiBold
-            color: "#ffffff"
-        }
-
-        Text {
-            anchors.right: parent.right
-            anchors.verticalCenter: parent.verticalCenter
-            text: line.value
-            font.family: root.fontFamily
-            font.pixelSize: 12 * root.unit
-            color: "#cccccc"
-        }
-    }
-
     Column {
         id: column
 
@@ -298,45 +258,48 @@ Item {
                 visible: root.sevenDay !== null
             }
 
-            Text {
+            Note {
                 visible: root.fiveHour === null && root.sevenDay === null
-                width: parent.width
                 text: root.claude ? "No limit data in the last update." : "No data yet. Enable the statusline hook and send a message in Claude Code."
-                wrapMode: Text.Wrap
-                font.family: root.fontFamily
-                font.pixelSize: 12 * root.unit
-                color: "#8cffffff"
             }
         }
 
         Column {
             visible: root.showOpencode
             width: parent.width
-            spacing: 6 * root.unit
+            spacing: 10 * root.unit
 
             SectionTitle {
-                text: "OPENCODE"
+                text: root.opencode && root.opencode.updated ? "OPENCODE GO  ·  " + root.ago(root.opencode.updated) : "OPENCODE GO"
             }
 
-            StatLine {
-                visible: root.opencode !== null
-                label: "Today"
-                value: root.opencode ? root.money(root.opencode.cost_day) + "  ·  " + root.tokens(root.opencode.tokens_day) + " tokens  ·  " + root.opencode.sessions_day + " sess." : ""
+            UsageBar {
+                label: "5 hours"
+                info: root.goRolling
+                visible: root.goRolling !== null
             }
 
-            StatLine {
-                visible: root.opencode !== null
-                label: "7 days"
-                value: root.opencode ? root.money(root.opencode.cost_week) + "  ·  " + root.tokens(root.opencode.tokens_week) + " tokens  ·  " + root.opencode.sessions_week + " sess." : ""
+            UsageBar {
+                label: "Week"
+                info: root.goWeekly
+                visible: root.goWeekly !== null
             }
 
-            Text {
-                visible: root.opencode === null
-                width: parent.width
-                text: root.opencodeFailed ? "OpenCode database unavailable." : "Loading..."
-                font.family: root.fontFamily
-                font.pixelSize: 12 * root.unit
-                color: "#8cffffff"
+            UsageBar {
+                label: "Month"
+                info: root.goMonthly
+                visible: root.goMonthly !== null
+            }
+
+            Note {
+                visible: root.goWeekly === null && !(root.opencode && root.opencode.error)
+                text: "Loading..."
+            }
+
+            Note {
+                visible: root.opencode !== null && root.opencode.error !== undefined
+                text: root.opencode && root.opencode.error ? "Last refresh failed: " + root.opencode.error + ". Check your OpenCode Go key." : ""
+                color: "#ff9b9b"
             }
         }
     }

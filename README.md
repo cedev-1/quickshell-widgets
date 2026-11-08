@@ -151,7 +151,7 @@ Use `Up`/`Down` (or `K`/`J`), `Enter` to run and `Esc` to close, or click a butt
 With `usage.enable = true`, a bot button appears in the bar above the power button. It opens a panel on the bar side, at the same place as the notifications (which are replaced while it is open), with:
 
 - **Claude Code**: the 5 hour and weekly limits as progress bars (red above 90 %) with the time left before each reset.
-- **OpenCode**: cost, tokens and session count for today and for the last 7 days, read from its local SQLite database. A session is counted at its last update.
+- **OpenCode Go**: the 5 hour, weekly and monthly limits of your account, with the time left before each reset and a "limit reached" mark. They are computed by the OpenCode server, so they include your other machines.
 
 The Claude numbers come from the official statusline of Claude Code, not from any API, so no credentials are read and nothing goes over the network. They are only provided on claude.ai Pro and Max plans, after the first answer of a session, and they refresh while you use Claude Code. The module installs `quickshell-claude-usage`, a small command that stores the limits in `~/.cache/quickshell-usage/claude.json` and prints a short `5h 23% · 7d 41%` line. Enable it in `~/.claude/settings.json`:
 
@@ -160,6 +160,8 @@ The Claude numbers come from the official statusline of Claude Code, not from an
   "statusLine": { "type": "command", "command": "quickshell-claude-usage" }
 }
 ```
+
+The OpenCode Go numbers come from the endpoint OpenCode itself uses (`https://opencode.ai/zen/go/v1/usage`, which is not documented and may change). The module installs `quickshell-opencode-usage`, run by the widget at most every `usage.interval`, which reads the `opencode-go` key of `~/.local/share/opencode/auth.json`, asks the server for the limits and stores only the percentages and reset times in `~/.cache/quickshell-usage/opencode.json`. The key is never copied, written or put on a command line. If the key is rejected, the panel shows the error and keeps the last values; run `opencode auth login` again to renew it.
 
 The `quickshell-usage` command toggles the panel on the focused screen. Set `usage.claude = false` or `usage.opencode = false` to hide a section.
 
@@ -232,8 +234,9 @@ Every component also has `enable` and `screens` (empty means the global `screens
 - `bar.screens` - Monitors that get the bar. Empty (default) means every screen that has the frame. The other screens keep the border without the bar.
 - `usage.enable` - AI usage panel and its bot button (default: false)
 - `usage.claude` - Show the Claude Code limits (default: true)
-- `usage.opencode` - Show the OpenCode usage (default: true)
-- `usage.interval` - Refresh interval of the OpenCode numbers in milliseconds (default: 60000)
+- `usage.opencode` - Show the OpenCode Go limits (default: true)
+- `usage.opencodeWorkspace` - Optional OpenCode console workspace id (`wrk_...`), sent with the request (default: empty)
+- `usage.interval` - Refresh interval of the OpenCode Go limits in milliseconds, while the panel is open (default: 300000)
 - `session.enable` - Session menu (default: true)
 - `session.commands.{lock,logout,suspend,reboot,shutdown}` - Commands of the buttons. Empty hides a button. Defaults use absolute paths (`systemctl`, `hyprctl`, `quickshell-lock`).
 - `launcher.enable` - Application launcher (default: true)

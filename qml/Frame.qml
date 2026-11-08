@@ -29,8 +29,10 @@ Scope {
     property bool usageClaude: true
     property bool usageOpencode: true
     property string usageClaudeFile: ""
-    property string usageOpencodeDb: ""
-    property int usageInterval: 60000
+    property string usageOpencodeFile: ""
+    property string usageOpencodeCommand: ""
+    property string usageOpencodeWorkspace: ""
+    property int usageInterval: 300000
     property bool notificationsEnabled: true
     property int notificationTimeout: 5000
     property int maxNotifications: 4

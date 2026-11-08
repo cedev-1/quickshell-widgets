@@ -111,8 +111,10 @@ ShellRoot {
             usageClaude: root.text("FRAME_USAGE_CLAUDE", "1") !== "0"
             usageOpencode: root.text("FRAME_USAGE_OPENCODE", "1") !== "0"
             usageClaudeFile: root.text("FRAME_USAGE_CLAUDE_FILE", Quickshell.env("HOME") + "/.cache/quickshell-usage/claude.json")
-            usageOpencodeDb: root.text("FRAME_USAGE_OPENCODE_DB", Quickshell.env("HOME") + "/.local/share/opencode/opencode.db")
-            usageInterval: root.number("FRAME_USAGE_INTERVAL", 60000)
+            usageOpencodeFile: root.text("FRAME_USAGE_OPENCODE_FILE", Quickshell.env("HOME") + "/.cache/quickshell-usage/opencode.json")
+            usageOpencodeCommand: root.text("FRAME_USAGE_OPENCODE_COMMAND", "quickshell-opencode-usage")
+            usageOpencodeWorkspace: root.text("FRAME_USAGE_OPENCODE_WORKSPACE", "")
+            usageInterval: root.number("FRAME_USAGE_INTERVAL", 300000)
             sessionEnabled: root.text("FRAME_SESSION", "1") !== "0"
             sessionCommands: ({
                 lock: root.text("FRAME_SESSION_LOCK", ""),

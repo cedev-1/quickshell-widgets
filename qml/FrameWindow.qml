@@ -393,7 +393,9 @@ PanelWindow {
                     unit: win.unit
                     fontFamily: win.controller.fontFamily
                     claudeFile: win.controller.usageClaudeFile
-                    opencodeDb: win.controller.usageOpencodeDb
+                    opencodeFile: win.controller.usageOpencodeFile
+                    opencodeCommand: win.controller.usageOpencodeCommand
+                    opencodeWorkspace: win.controller.usageOpencodeWorkspace
                     showClaude: win.controller.usageClaude
                     showOpencode: win.controller.usageOpencode
                     interval: win.controller.usageInterval

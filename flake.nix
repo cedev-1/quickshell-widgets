@@ -27,6 +27,55 @@
       session = pkgs.writeShellScriptBin "quickshell-session" ''
         exec ${pkgs.quickshell}/bin/quickshell ipc -p ${mkConfig pkgs} call frame toggleSession
       '';
+      opencode-usage-fetch = pkgs.writeShellApplication {
+        name = "quickshell-opencode-usage";
+        runtimeInputs = [ pkgs.jq pkgs.curl pkgs.coreutils ];
+        text = ''
+          auth="''${OPENCODE_AUTH_FILE:-''${XDG_DATA_HOME:-$HOME/.local/share}/opencode/auth.json}"
+          dir="''${XDG_CACHE_HOME:-$HOME/.cache}/quickshell-usage"
+          out="$dir/opencode.json"
+          mkdir -p "$dir"
+          now="$(date +%s)"
+
+          save() {
+            tmp="$(mktemp "$dir/.opencode.XXXXXX")"
+            cat > "$tmp"
+            mv "$tmp" "$out"
+          }
+
+          fail() {
+            if [ -f "$out" ] && jq -e '.weekly' "$out" >/dev/null 2>&1; then
+              jq -c --arg e "$1" '. + {error: $e}' "$out" | save
+            else
+              jq -cn --argjson now "$now" --arg e "$1" '{updated: $now, error: $e}' | save
+            fi
+          }
+
+          key="$(jq -r '.["opencode-go"].key // empty' "$auth" 2>/dev/null || true)"
+          if [ -z "$key" ]; then
+            fail "no OpenCode Go key found"
+            exit 0
+          fi
+
+          body="$(mktemp "$dir/.opencode-body.XXXXXX")"
+          trap 'rm -f "$body"' EXIT
+          workspace="''${1:-}"
+          code="$(
+            {
+              printf 'header = "Authorization: Bearer %s"\n' "$key"
+              if [ -n "$workspace" ]; then
+                printf 'header = "x-opencode-org-id: %s"\n' "$workspace"
+              fi
+            } | curl -sS -m 15 -K - -H 'Accept: application/json' -o "$body" -w '%{http_code}' https://opencode.ai/zen/go/v1/usage 2>/dev/null || true
+          )"
+
+          if [ "$code" = 200 ] && jq -e '.usage.weekly' "$body" >/dev/null 2>&1; then
+            jq -c --argjson now "$now" '{updated: $now, rolling: .usage.rolling, weekly: .usage.weekly, monthly: .usage.monthly}' "$body" | save
+          else
+            fail "request failed (HTTP ''${code:-none})"
+          fi
+        '';
+      };
       claude-usage-hook = pkgs.writeShellApplication {
         name = "quickshell-claude-usage";
         runtimeInputs = [ pkgs.jq pkgs.coreutils ];
@@ -309,7 +358,7 @@
             enable = mkOption {
               type = types.bool;
               default = false;
-              description = "AI usage panel: a bot button above the clock opens a panel with the Claude Code limits (5 hours and week) and the OpenCode usage. Open it with the button or the quickshell-usage command.";
+              description = "AI usage panel: a bot button above the clock opens a panel with the Claude Code limits and the OpenCode Go limits (5 hours, week and month). Open it with the button or the quickshell-usage command.";
             };
             claude = mkOption {
               type = types.bool;
@@ -319,12 +368,18 @@
             opencode = mkOption {
               type = types.bool;
               default = true;
-              description = "Show the OpenCode cost and tokens, read from its local database (~/.local/share/opencode/opencode.db) with sqlite3.";
+              description = "Show the OpenCode Go limits (5 hours, week, month) of your account. They are read from the OpenCode server with the `opencode-go` key of ~/.local/share/opencode/auth.json, which is never copied anywhere.";
+            };
+            opencodeWorkspace = mkOption {
+              type = types.str;
+              default = "";
+              example = "wrk_01ABC...";
+              description = "Optional OpenCode console workspace id (the wrk_ segment of the console URL), sent with the request. Not a secret.";
             };
             interval = mkOption {
               type = types.ints.positive;
-              default = 60000;
-              description = "Refresh interval of the OpenCode numbers in milliseconds, while the panel is open";
+              default = 300000;
+              description = "Refresh interval of the OpenCode Go limits in milliseconds, while the panel is open";
             };
           };
           screens = screensOption;
@@ -338,6 +393,7 @@
           ++ lib.optional (cfg.frame.enable && cfg.frame.session.enable) self.packages.${pkgs.stdenv.hostPlatform.system}.session
           ++ lib.optional (cfg.frame.enable && cfg.frame.usage.enable) self.packages.${pkgs.stdenv.hostPlatform.system}.usage
           ++ lib.optional (cfg.frame.enable && cfg.frame.usage.enable && cfg.frame.usage.claude) self.packages.${pkgs.stdenv.hostPlatform.system}.claude-usage-hook
+          ++ lib.optional (cfg.frame.enable && cfg.frame.usage.enable && cfg.frame.usage.opencode) self.packages.${pkgs.stdenv.hostPlatform.system}.opencode-usage-fetch
           ++ lib.optional cfg.frame.enable self.packages.${pkgs.stdenv.hostPlatform.system}.dashboard
           ++ lib.optional (cfg.frame.enable && cfg.frame.notifications.enable) self.packages.${pkgs.stdenv.hostPlatform.system}.dnd;
 
@@ -349,7 +405,6 @@
           partOf = [ "graphical-session.target" ];
           after = [ "graphical-session.target" ];
           path = [ pkgs.coreutils pkgs.bash ]
-            ++ lib.optional (cfg.frame.enable && cfg.frame.usage.enable && cfg.frame.usage.opencode) pkgs.sqlite
             ++ lib.optional ((cfg.stats.enable && cfg.stats.gpu) || (cfg.frame.enable && cfg.frame.gpu)) config.hardware.nvidia.package.bin;
           environment = {
             QS_COMPONENTS = csv enabled;
@@ -393,6 +448,8 @@
             FRAME_USAGE_CLAUDE = if cfg.frame.usage.claude then "1" else "0";
             FRAME_USAGE_OPENCODE = if cfg.frame.usage.opencode then "1" else "0";
             FRAME_USAGE_INTERVAL = toString cfg.frame.usage.interval;
+            FRAME_USAGE_OPENCODE_COMMAND = "${self.packages.${pkgs.stdenv.hostPlatform.system}.opencode-usage-fetch}/bin/quickshell-opencode-usage";
+            FRAME_USAGE_OPENCODE_WORKSPACE = cfg.frame.usage.opencodeWorkspace;
             FRAME_SESSION = if cfg.frame.session.enable then "1" else "0";
             FRAME_SESSION_LOCK = cfg.frame.session.commands.lock;
             FRAME_SESSION_LOGOUT = cfg.frame.session.commands.logout;
