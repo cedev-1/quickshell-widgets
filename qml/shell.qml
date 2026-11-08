@@ -113,7 +113,6 @@ ShellRoot {
             usageClaudeFile: root.text("FRAME_USAGE_CLAUDE_FILE", Quickshell.env("HOME") + "/.cache/quickshell-usage/claude.json")
             usageOpencodeFile: root.text("FRAME_USAGE_OPENCODE_FILE", Quickshell.env("HOME") + "/.cache/quickshell-usage/opencode.json")
             usageOpencodeCommand: root.text("FRAME_USAGE_OPENCODE_COMMAND", "quickshell-opencode-usage")
-            usageOpencodeWorkspace: root.text("FRAME_USAGE_OPENCODE_WORKSPACE", "")
             usageInterval: root.number("FRAME_USAGE_INTERVAL", 300000)
             sessionEnabled: root.text("FRAME_SESSION", "1") !== "0"
             sessionCommands: ({

@@ -29,13 +29,14 @@
       '';
       opencode-usage-fetch = pkgs.writeShellApplication {
         name = "quickshell-opencode-usage";
-        runtimeInputs = [ pkgs.jq pkgs.curl pkgs.coreutils ];
+        runtimeInputs = [ pkgs.jq pkgs.curl pkgs.coreutils pkgs.gnugrep pkgs.gawk ];
         text = ''
-          auth="''${OPENCODE_AUTH_FILE:-''${XDG_DATA_HOME:-$HOME/.local/share}/opencode/auth.json}"
+          registration="''${OPENCODE_SERVICE_FILE:-''${XDG_STATE_HOME:-$HOME/.local/state}/opencode/service.json}"
           dir="''${XDG_CACHE_HOME:-$HOME/.cache}/quickshell-usage"
           out="$dir/opencode.json"
           mkdir -p "$dir"
           now="$(date +%s)"
+          export PATH="$PATH:/etc/profiles/per-user/''${USER:-$(id -un)}/bin:/run/current-system/sw/bin:$HOME/.nix-profile/bin"
 
           save() {
             tmp="$(mktemp "$dir/.opencode.XXXXXX")"
@@ -51,28 +52,79 @@
             fi
           }
 
-          key="$(jq -r '.["opencode-go"].key // empty' "$auth" 2>/dev/null || true)"
-          if [ -z "$key" ]; then
-            fail "no OpenCode Go key found"
+          work="$(mktemp -d "$dir/.opencode-work.XXXXXX")"
+          server_pid=""
+          cleanup() {
+            if [ -n "$server_pid" ]; then
+              kill "$server_pid" 2>/dev/null || true
+              for _ in $(seq 1 20); do
+                if ! kill -0 "$server_pid" 2>/dev/null; then
+                  break
+                fi
+                sleep 0.25
+              done
+              kill -9 "$server_pid" 2>/dev/null || true
+            fi
+            rm -rf "$work"
+          }
+          trap cleanup EXIT
+
+          url=""
+          password=""
+          if [ -f "$registration" ]; then
+            service_pid="$(jq -r '.pid // empty' "$registration" 2>/dev/null || true)"
+            if [ -n "$service_pid" ] && kill -0 "$service_pid" 2>/dev/null; then
+              url="$(jq -r '.url // empty' "$registration" 2>/dev/null || true)"
+              password="$(jq -r '.password // empty' "$registration" 2>/dev/null || true)"
+            fi
+          fi
+
+          if [ -z "$url" ]; then
+            if ! command -v opencode >/dev/null 2>&1; then
+              fail "OpenCode is not running and the opencode command was not found"
+              exit 0
+            fi
+            port="$(shuf -i 20000-60000 -n 1)"
+            opencode serve --hostname 127.0.0.1 --port "$port" > "$work/server.log" 2>&1 &
+            server_pid=$!
+            for _ in $(seq 1 60); do
+              if grep -q 'server listening' "$work/server.log" 2>/dev/null; then
+                break
+              fi
+              if ! kill -0 "$server_pid" 2>/dev/null; then
+                break
+              fi
+              sleep 0.5
+            done
+            if ! grep -q 'server listening' "$work/server.log" 2>/dev/null; then
+              fail "could not start a temporary OpenCode server"
+              exit 0
+            fi
+            password="$(grep -o 'server password .*' "$work/server.log" | awk '{print $3}' | head -n 1 || true)"
+            url="http://127.0.0.1:$port"
+          fi
+
+          body="$work/body"
+          code="$(
+            {
+              if [ -n "$password" ]; then
+                printf 'user = "opencode:%s"\n' "$password"
+              fi
+            } | curl -sS -m 20 -K - -o "$body" -w '%{http_code}' "$url/api/experimental/usage/limits" 2>/dev/null || true
+          )"
+
+          if [ "$code" != 200 ]; then
+            message="$(jq -r '.message // ._tag // empty' "$body" 2>/dev/null || true)"
+            fail "request failed (HTTP ''${code:-none}''${message:+: $message})"
             exit 0
           fi
 
-          body="$(mktemp "$dir/.opencode-body.XXXXXX")"
-          trap 'rm -f "$body"' EXIT
-          workspace="''${1:-}"
-          code="$(
-            {
-              printf 'header = "Authorization: Bearer %s"\n' "$key"
-              if [ -n "$workspace" ]; then
-                printf 'header = "x-opencode-org-id: %s"\n' "$workspace"
-              fi
-            } | curl -sS -m 15 -K - -H 'Accept: application/json' -o "$body" -w '%{http_code}' https://opencode.ai/zen/go/v1/usage 2>/dev/null || true
-          )"
-
-          if [ "$code" = 200 ] && jq -e '.usage.weekly' "$body" >/dev/null 2>&1; then
-            jq -c --argjson now "$now" '{updated: $now, rolling: .usage.rolling, weekly: .usage.weekly, monthly: .usage.monthly}' "$body" | save
+          if jq -e '.data.go' "$body" >/dev/null 2>&1; then
+            jq -c --argjson now "$now" '{updated: $now, rolling: .data.go.rolling, weekly: .data.go.weekly, monthly: .data.go.monthly}' "$body" | save
+          elif jq -e '.data == null' "$body" >/dev/null 2>&1; then
+            fail "not signed in to the OpenCode console (run opencode auth login)"
           else
-            fail "request failed (HTTP ''${code:-none})"
+            fail "no OpenCode Go plan in this workspace"
           fi
         '';
       };
@@ -368,13 +420,7 @@
             opencode = mkOption {
               type = types.bool;
               default = true;
-              description = "Show the OpenCode Go limits (5 hours, week, month) of your account. They are read from the OpenCode server with the `opencode-go` key of ~/.local/share/opencode/auth.json, which is never copied anywhere.";
-            };
-            opencodeWorkspace = mkOption {
-              type = types.str;
-              default = "";
-              example = "wrk_01ABC...";
-              description = "Optional OpenCode console workspace id (the wrk_ segment of the console URL), sent with the request. Not a secret.";
+              description = "Show the OpenCode Go limits (5 hours, week, month) of your account. They come from the local OpenCode service (OpenCode v2, signed in to the OpenCode console), which asks the OpenCode server and handles the credentials itself.";
             };
             interval = mkOption {
               type = types.ints.positive;
@@ -449,7 +495,6 @@
             FRAME_USAGE_OPENCODE = if cfg.frame.usage.opencode then "1" else "0";
             FRAME_USAGE_INTERVAL = toString cfg.frame.usage.interval;
             FRAME_USAGE_OPENCODE_COMMAND = "${self.packages.${pkgs.stdenv.hostPlatform.system}.opencode-usage-fetch}/bin/quickshell-opencode-usage";
-            FRAME_USAGE_OPENCODE_WORKSPACE = cfg.frame.usage.opencodeWorkspace;
             FRAME_SESSION = if cfg.frame.session.enable then "1" else "0";
             FRAME_SESSION_LOCK = cfg.frame.session.commands.lock;
             FRAME_SESSION_LOGOUT = cfg.frame.session.commands.logout;

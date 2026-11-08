@@ -13,7 +13,6 @@ Item {
     property string claudeFile: ""
     property string opencodeFile: ""
     property string opencodeCommand: ""
-    property string opencodeWorkspace: ""
     property bool showClaude: true
     property bool showOpencode: true
     property int interval: 300000
@@ -45,8 +44,8 @@ Item {
     function goWindow(w) {
         if (!w || w.percent === undefined)
             return null;
-        var resets = w.resetsAt ? Date.parse(w.resetsAt) / 1000 : undefined;
-        return windowState(w.percent, resets, w.status === "rate-limited");
+        var resets = w.resetsAt !== undefined ? w.resetsAt / 1000 : undefined;
+        return windowState(w.percent, resets, w.limited === true);
     }
 
     function remaining(resetsAt) {
@@ -88,8 +87,6 @@ Item {
         if (opencode && opencode.updated && nowSeconds - opencode.updated < 60 && !opencode.error)
             return;
         var command = [opencodeCommand];
-        if (opencodeWorkspace !== "")
-            command.push(opencodeWorkspace);
         fetchProcess.command = command;
         fetchProcess.running = true;
     }
@@ -298,7 +295,7 @@ Item {
 
             Note {
                 visible: root.opencode !== null && root.opencode.error !== undefined
-                text: root.opencode && root.opencode.error ? "Last refresh failed: " + root.opencode.error + ". Check your OpenCode Go key." : ""
+                text: root.opencode && root.opencode.error ? "Last refresh failed: " + root.opencode.error : ""
                 color: "#ff9b9b"
             }
         }

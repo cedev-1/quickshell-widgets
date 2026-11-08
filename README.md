@@ -161,7 +161,7 @@ The Claude numbers come from the official statusline of Claude Code, not from an
 }
 ```
 
-The OpenCode Go numbers come from the endpoint OpenCode itself uses (`https://opencode.ai/zen/go/v1/usage`, which is not documented and may change). The module installs `quickshell-opencode-usage`, run by the widget at most every `usage.interval`, which reads the `opencode-go` key of `~/.local/share/opencode/auth.json`, asks the server for the limits and stores only the percentages and reset times in `~/.cache/quickshell-usage/opencode.json`. The key is never copied, written or put on a command line. If the key is rejected, the panel shows the error and keeps the last values; run `opencode auth login` again to renew it.
+The OpenCode Go numbers need **OpenCode v2** signed in to the OpenCode console (`opencode auth login`, or the sign-in from the web interface). OpenCode v2 exposes them on its local server (`GET /api/experimental/usage/limits`, an experimental route) and handles the credentials and their renewal itself. The module installs `quickshell-opencode-usage`, run by the widget at most every `usage.interval` while the panel is open. It uses the OpenCode background service registered in `~/.local/state/opencode/service.json` when its process is alive. Otherwise it starts a temporary `opencode serve` on a random local port (the `opencode` command must be in your profile), reads the limits and stops it, which takes about two seconds. Only the percentages and reset times are stored, in `~/.cache/quickshell-usage/opencode.json`; no OpenCode credential is read or copied by the widget. If a refresh fails, the panel keeps the last values and shows the error.
 
 The `quickshell-usage` command toggles the panel on the focused screen. Set `usage.claude = false` or `usage.opencode = false` to hide a section.
 
@@ -235,7 +235,6 @@ Every component also has `enable` and `screens` (empty means the global `screens
 - `usage.enable` - AI usage panel and its bot button (default: false)
 - `usage.claude` - Show the Claude Code limits (default: true)
 - `usage.opencode` - Show the OpenCode Go limits (default: true)
-- `usage.opencodeWorkspace` - Optional OpenCode console workspace id (`wrk_...`), sent with the request (default: empty)
 - `usage.interval` - Refresh interval of the OpenCode Go limits in milliseconds, while the panel is open (default: 300000)
 - `session.enable` - Session menu (default: true)
 - `session.commands.{lock,logout,suspend,reboot,shutdown}` - Commands of the buttons. Empty hides a button. Defaults use absolute paths (`systemctl`, `hyprctl`, `quickshell-lock`).

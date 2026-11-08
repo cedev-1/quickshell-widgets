@@ -395,7 +395,6 @@ PanelWindow {
                     claudeFile: win.controller.usageClaudeFile
                     opencodeFile: win.controller.usageOpencodeFile
                     opencodeCommand: win.controller.usageOpencodeCommand
-                    opencodeWorkspace: win.controller.usageOpencodeWorkspace
                     showClaude: win.controller.usageClaude
                     showOpencode: win.controller.usageOpencode
                     interval: win.controller.usageInterval
