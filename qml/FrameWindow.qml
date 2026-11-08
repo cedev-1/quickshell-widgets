@@ -19,6 +19,12 @@ PanelWindow {
     readonly property real rounding: controller.rounding
     readonly property color frameColor: "#0a0a0a"
 
+    readonly property bool hasBar: controller.hasBar(modelData.name)
+    readonly property bool barRight: controller.barPosition === "right"
+    readonly property real barInset: hasBar ? barWidth : edge
+    readonly property real leftInset: barRight ? edge : barInset
+    readonly property real rightInset: barRight ? barInset : edge
+
     readonly property bool onFocusedScreen: Hyprland.focusedMonitor ? Hyprland.focusedMonitor.name === modelData.name : true
 
     readonly property real pad: 24 * unit
@@ -36,58 +42,71 @@ PanelWindow {
     readonly property real notifBottom: content.height - 90 * unit
     readonly property real notifTop: notifBottom - notifHeight
 
-    readonly property real holeLeft: barWidth
-    readonly property real holeRight: content.width - edge
+    readonly property real holeLeft: leftInset
+    readonly property real holeRight: content.width - rightInset
     readonly property real holeBottom: content.height - edge
     readonly property real panelLeft: (holeLeft + holeRight) / 2 - panelWidth / 2
 
     readonly property string framePath: {
         var W = content.width, H = content.height;
-        var R = rounding, T = edge, L = holeLeft;
-        var right = holeRight, bottom = holeBottom;
+        var R = rounding, T = edge, L = barInset;
+        var right = W - edge, bottom = H - edge;
+        var mirror = barRight;
+
+        function X(x) {
+            return mirror ? W - x : x;
+        }
+
+        function arc(r, x, y, sweep) {
+            return " A" + r + " " + r + " 0 0 " + (mirror ? 1 - sweep : sweep) + " " + X(x) + " " + y;
+        }
+
+        function hline(x) {
+            return " H" + X(x);
+        }
 
         var d = "M0 0 L" + W + " 0 L" + W + " " + H + " L0 " + H + " Z";
-        d += " M" + (L + R) + " " + T;
+        d += " M" + X(L + R) + " " + T;
 
         if (depth > 0.5) {
             var hd = depth;
-            var x0 = panelLeft, x1 = panelLeft + panelWidth;
+            var x0 = (L + right) / 2 - panelWidth / 2, x1 = x0 + panelWidth;
             var rf = Math.min(R, hd / 2);
             var rp = Math.min(R, hd / 2, panelWidth / 2);
 
-            d += " H" + (x0 - rf);
-            d += " A" + rf + " " + rf + " 0 0 1 " + x0 + " " + (T + rf);
+            d += hline(x0 - rf);
+            d += arc(rf, x0, T + rf, 1);
             d += " V" + (T + hd - rp);
-            d += " A" + rp + " " + rp + " 0 0 0 " + (x0 + rp) + " " + (T + hd);
-            d += " H" + (x1 - rp);
-            d += " A" + rp + " " + rp + " 0 0 0 " + x1 + " " + (T + hd - rp);
+            d += arc(rp, x0 + rp, T + hd, 0);
+            d += hline(x1 - rp);
+            d += arc(rp, x1, T + hd - rp, 0);
             d += " V" + (T + rf);
-            d += " A" + rf + " " + rf + " 0 0 1 " + (x1 + rf) + " " + T;
+            d += arc(rf, x1 + rf, T, 1);
         }
 
-        d += " H" + (right - R);
-        d += " A" + R + " " + R + " 0 0 1 " + right + " " + (T + R);
+        d += hline(right - R);
+        d += arc(R, right, T + R, 1);
         d += " V" + (bottom - R);
-        d += " A" + R + " " + R + " 0 0 1 " + (right - R) + " " + bottom;
-        d += " H" + (L + R);
-        d += " A" + R + " " + R + " 0 0 1 " + L + " " + (bottom - R);
+        d += arc(R, right - R, bottom, 1);
+        d += hline(L + R);
+        d += arc(R, L, bottom - R, 1);
 
         if (notifDepth > 0.5 && notifHeight > 1) {
             var nd = notifDepth, pb = notifBottom, py = notifTop;
             var nrf = Math.min(R, nd / 2, notifHeight / 2);
 
             d += " V" + (pb + nrf);
-            d += " A" + nrf + " " + nrf + " 0 0 1 " + (L + nrf) + " " + pb;
-            d += " H" + (L + nd - nrf);
-            d += " A" + nrf + " " + nrf + " 0 0 0 " + (L + nd) + " " + (pb - nrf);
+            d += arc(nrf, L + nrf, pb, 1);
+            d += hline(L + nd - nrf);
+            d += arc(nrf, L + nd, pb - nrf, 0);
             d += " V" + (py + nrf);
-            d += " A" + nrf + " " + nrf + " 0 0 0 " + (L + nd - nrf) + " " + py;
-            d += " H" + (L + nrf);
-            d += " A" + nrf + " " + nrf + " 0 0 1 " + L + " " + (py - nrf);
+            d += arc(nrf, L + nd - nrf, py, 0);
+            d += hline(L + nrf);
+            d += arc(nrf, L, py - nrf, 1);
         }
 
         d += " V" + (T + R);
-        d += " A" + R + " " + R + " 0 0 1 " + (L + R) + " " + T;
+        d += arc(R, L + R, T, 1);
         d += " Z";
         return d;
     }
@@ -106,10 +125,10 @@ PanelWindow {
     WlrLayershell.exclusionMode: ExclusionMode.Ignore
 
     mask: Region {
-        Region { item: barArea }
+        Region { item: leftArea }
+        Region { item: rightArea }
         Region { item: topArea }
         Region { item: bottomArea }
-        Region { item: rightArea }
         Region { item: cornerTopLeft }
         Region { item: cornerTopRight }
         Region { item: cornerBottomLeft }
@@ -144,7 +163,6 @@ PanelWindow {
         NumberAnimation { duration: 300; easing.type: Easing.OutCubic }
     }
 
-
     Behavior on notifHeight {
         NumberAnimation { duration: 250; easing.type: Easing.OutCubic }
     }
@@ -177,7 +195,8 @@ PanelWindow {
         }
 
         FrameBar {
-            x: 0
+            visible: win.hasBar
+            x: win.barRight ? parent.width - win.barWidth : 0
             y: 0
             width: win.barWidth
             height: parent.height
@@ -206,7 +225,7 @@ PanelWindow {
         }
 
         Item {
-            x: win.holeLeft
+            x: win.barRight ? win.holeRight - win.notifDepth : win.holeLeft
             y: win.notifTop
             width: win.notifDepth
             height: win.notifHeight
@@ -216,7 +235,7 @@ PanelWindow {
             Column {
                 id: notifColumn
 
-                x: win.notifPad - (win.notifWidth - win.notifDepth)
+                x: win.barRight ? win.notifPad + (win.notifWidth - win.notifDepth) : win.notifPad - (win.notifWidth - win.notifDepth)
                 y: win.notifPad
                 spacing: 8 * win.unit
 
@@ -233,15 +252,15 @@ PanelWindow {
             }
         }
 
-        Item { id: barArea; x: 0; y: 0; width: win.barWidth; height: parent.height }
-        Item { id: topArea; x: win.barWidth; y: 0; width: parent.width - win.barWidth; height: win.edge }
-        Item { id: bottomArea; x: win.barWidth; y: win.holeBottom; width: parent.width - win.barWidth; height: win.edge }
-        Item { id: rightArea; x: win.holeRight; y: win.edge; width: win.edge; height: win.holeBottom - win.edge }
+        Item { id: leftArea; x: 0; y: 0; width: win.leftInset; height: parent.height }
+        Item { id: rightArea; x: parent.width - win.rightInset; y: 0; width: win.rightInset; height: parent.height }
+        Item { id: topArea; x: win.leftInset; y: 0; width: parent.width - win.leftInset - win.rightInset; height: win.edge }
+        Item { id: bottomArea; x: win.leftInset; y: win.holeBottom; width: parent.width - win.leftInset - win.rightInset; height: win.edge }
         Item { id: cornerTopLeft; x: win.holeLeft; y: win.edge; width: win.rounding; height: win.rounding }
         Item { id: cornerTopRight; x: win.holeRight - win.rounding; y: win.edge; width: win.rounding; height: win.rounding }
         Item { id: cornerBottomLeft; x: win.holeLeft; y: win.holeBottom - win.rounding; width: win.rounding; height: win.rounding }
         Item { id: cornerBottomRight; x: win.holeRight - win.rounding; y: win.holeBottom - win.rounding; width: win.rounding; height: win.rounding }
-        Item { id: notifArea; x: win.holeLeft; y: win.notifTop; width: win.notifDepth; height: win.notifHeight }
+        Item { id: notifArea; x: win.barRight ? win.holeRight - win.notifDepth : win.holeLeft; y: win.notifTop; width: win.notifDepth; height: win.notifHeight }
 
         Item {
             id: panelArea

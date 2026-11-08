@@ -139,6 +139,23 @@ The dashboard opens when the pointer touches the top edge (`hover`) and closes w
 hl.bind("SUPER + D", hl.dsp.exec_cmd("quickshell-dashboard"))
 ```
 
+### Choosing where the frame and the bar go
+
+`frame.screens` decides which screens get the frame (border, dashboard, notifications). `frame.bar.screens` decides which of those also get the bar, and `frame.bar.position` puts it on the left or on the right. For example, the bar only on the main screen, on the left, while the second one keeps a thin border:
+
+```nix
+services.quickshell-widgets.frame = {
+  enable = true;
+  screens = [ "HDMI-A-1" "HDMI-A-2" ];
+  bar = {
+    position = "left";
+    screens = [ "HDMI-A-1" ];
+  };
+};
+```
+
+To have no frame at all on the second screen, list only the first one in `frame.screens`. Monitor names come from `hyprctl monitors`.
+
 ### Notifications
 
 The frame is also a notification daemon (`org.freedesktop.Notifications`). Notifications appear in a panel attached to the right side of the bar, above the clock, with the same rounded junctions as the dashboard. Up to four are shown, newest first, with icon, title, body (markup) and action buttons. Click a notification to dismiss it. They expire after `notifications.timeout` (critical ones stay until dismissed) and the timer pauses while the pointer is over them.
@@ -192,6 +209,9 @@ Every component also has `enable` and `screens` (empty means the global `screens
 - `font` - Font family (default: `JetBrainsMono Nerd Font`)
 - `gpu` - Show NVIDIA GPU and VRAM in the dashboard (default: false)
 - `hover` - Open the dashboard when the pointer touches the top edge (default: true)
+- `bar.enable` - Show the vertical bar (default: true). Without it the frame keeps a thin uniform border.
+- `bar.position` - `left` (default) or `right`
+- `bar.screens` - Monitors that get the bar. Empty (default) means every screen that has the frame. The other screens keep the border without the bar.
 - `notifications.enable` - Use the frame as the notification daemon (default: true)
 - `notifications.timeout` - Display time in milliseconds (default: 5000)
 

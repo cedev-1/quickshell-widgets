@@ -115,6 +115,9 @@ ShellRoot {
             fontFamily: root.text("FRAME_FONT", "JetBrainsMono Nerd Font")
             gpu: root.text("FRAME_GPU", "0") === "1"
             hoverOpen: root.text("FRAME_HOVER", "1") !== "0"
+            barEnabled: root.text("FRAME_BAR", "1") !== "0"
+            barPosition: root.text("FRAME_BAR_POSITION", "left")
+            barScreens: root.csv("FRAME_BAR_SCREENS")
             notificationsEnabled: root.text("FRAME_NOTIFICATIONS", "1") !== "0"
             notificationTimeout: root.number("FRAME_NOTIFICATION_TIMEOUT", 5000)
         }

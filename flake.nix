@@ -233,6 +233,24 @@
               description = "Display time in milliseconds for notifications that do not set one. Critical notifications stay until dismissed.";
             };
           };
+          bar = {
+            enable = mkOption {
+              type = types.bool;
+              default = true;
+              description = "Show the vertical bar. Without it the frame keeps a thin uniform border.";
+            };
+            position = mkOption {
+              type = types.enum [ "left" "right" ];
+              default = "left";
+              description = "Side of the screen the bar is attached to";
+            };
+            screens = mkOption {
+              type = types.listOf types.str;
+              default = [ ];
+              example = [ "HDMI-A-1" ];
+              description = "Monitors that get the bar (see `hyprctl monitors`). Empty means every screen that has the frame. The other screens keep the border without the bar.";
+            };
+          };
           screens = screensOption;
         };
       };
@@ -292,6 +310,9 @@
             FRAME_GPU = if cfg.frame.gpu then "1" else "0";
             FRAME_HOVER = if cfg.frame.hover then "1" else "0";
             FRAME_SCREENS = csv cfg.frame.screens;
+            FRAME_BAR = if cfg.frame.bar.enable then "1" else "0";
+            FRAME_BAR_POSITION = cfg.frame.bar.position;
+            FRAME_BAR_SCREENS = csv cfg.frame.bar.screens;
             FRAME_NOTIFICATIONS = if cfg.frame.notifications.enable then "1" else "0";
             FRAME_NOTIFICATION_TIMEOUT = toString cfg.frame.notifications.timeout;
           };

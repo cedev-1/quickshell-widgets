@@ -16,6 +16,9 @@ Scope {
     property string fontFamily: "JetBrainsMono Nerd Font"
     property bool gpu: false
     property bool hoverOpen: true
+    property bool barEnabled: true
+    property string barPosition: "left"
+    property var barScreens: []
     property bool notificationsEnabled: true
     property int notificationTimeout: 5000
     property int maxNotifications: 4
@@ -35,6 +38,10 @@ Scope {
         var all = server.trackedNotifications.values.slice();
         all.reverse();
         return all.slice(0, maxNotifications);
+    }
+
+    function hasBar(screenName: string): bool {
+        return barEnabled && (barScreens.length === 0 || barScreens.indexOf(screenName) >= 0);
     }
 
     function openDashboard(screenName: string, byHover: bool): void {
@@ -121,7 +128,7 @@ Scope {
             FrameExclusion {
                 targetScreen: perScreen.modelData
                 edge: "left"
-                size: root.barWidth
+                size: root.barPosition !== "right" && root.hasBar(perScreen.modelData.name) ? root.barWidth : root.edge
             }
 
             FrameExclusion {
@@ -133,7 +140,7 @@ Scope {
             FrameExclusion {
                 targetScreen: perScreen.modelData
                 edge: "right"
-                size: root.edge
+                size: root.barPosition === "right" && root.hasBar(perScreen.modelData.name) ? root.barWidth : root.edge
             }
 
             FrameExclusion {
