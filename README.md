@@ -6,7 +6,7 @@ Quickshell components for Hyprland on NixOS, all in one flake. Enable only the o
 - **stats**: CPU (with temperature), RAM, disk and optional NVIDIA GPU/VRAM, read from `/proc`, `df`, `/sys/class/hwmon` and `nvidia-smi`.
 - **header**: floating header with three rounded islands: active window title, workspaces and date/time. Requires the Lua dispatch syntax (Hyprland >= 0.55).
 - **lock**: lock screen with a blurred wallpaper, a big clock and a password field (password only, authenticated through PAM). Inspired by the lock screen of Caelestia, without weather, fingerprint or Howdy.
-- **frame**: Caelestia-style screen frame. A vertical bar on the left (logo, workspaces, time), a rounded border around the screen, a dashboard (calendar, clock, system stats) that slides from the top edge, an application launcher that slides from the bottom edge and notifications that slide out of the bar. Replaces Waybar, the header, the notification daemon and the launcher.
+- **frame**: Caelestia-style screen frame. A vertical bar on the left (logo, workspaces, time), a rounded border around the screen, a dashboard (calendar, clock, system stats) that slides from the top edge, an application launcher that slides from the bottom edge, a session menu, an optional AI usage panel and notifications that slide out of the sides. Replaces Waybar, the header, the notification daemon and the launcher.
 
 All components run in a single Quickshell process.
 
@@ -136,6 +136,33 @@ hl.bind("SUPER + R", hl.dsp.exec_cmd("quickshell-launcher"))
 
 Type to search (name, generic name, comment and keywords), `Up`/`Down` or `Ctrl+K`/`Ctrl+J` (also `Ctrl+P`/`Ctrl+N`) to move, `Enter` to launch and `Esc` to close. Clicking outside also closes it. Applications that run in a terminal are started with `launcher.terminal`.
 
+### Session menu
+
+A panel with lock, logout, sleep, reboot and shutdown buttons slides out of the side opposite to the bar, vertically centered, with the same rounded junctions. Open it with the power button at the bottom of the bar or with the `quickshell-session` command, which toggles it on the focused screen:
+
+```lua
+hl.bind("SUPER + X", hl.dsp.exec_cmd("quickshell-session"))
+```
+
+Use `Up`/`Down` (or `K`/`J`), `Enter` to run and `Esc` to close, or click a button. The commands are options (`session.commands.*`) with absolute paths, because the service has a minimal `PATH`. The lock button runs `quickshell-lock` when `lock.enable` is set, and any button whose command is empty is hidden. The default logout command exits Hyprland through its Lua dispatcher.
+
+### AI usage panel
+
+With `usage.enable = true`, a bot button appears in the bar above the power button. It opens a panel on the bar side, at the same place as the notifications (which are replaced while it is open), with:
+
+- **Claude Code**: the 5 hour and weekly limits as progress bars (red above 90 %) with the time left before each reset.
+- **OpenCode**: cost, tokens and session count for today and for the last 7 days, read from its local SQLite database. A session is counted at its last update.
+
+The Claude numbers come from the official statusline of Claude Code, not from any API, so no credentials are read and nothing goes over the network. They are only provided on claude.ai Pro and Max plans, after the first answer of a session, and they refresh while you use Claude Code. The module installs `quickshell-claude-usage`, a small command that stores the limits in `~/.cache/quickshell-usage/claude.json` and prints a short `5h 23% · 7d 41%` line. Enable it in `~/.claude/settings.json`:
+
+```json
+{
+  "statusLine": { "type": "command", "command": "quickshell-claude-usage" }
+}
+```
+
+The `quickshell-usage` command toggles the panel on the focused screen. Set `usage.claude = false` or `usage.opencode = false` to hide a section.
+
 ### Choosing where the frame and the bar go
 
 `frame.screens` decides which screens get the frame (border, dashboard, notifications). `frame.bar.screens` decides which of those also get the bar, and `frame.bar.position` puts it on the left or on the right. For example, the bar only on the main screen, on the left, while the second one keeps a thin border:
@@ -203,6 +230,12 @@ Every component also has `enable` and `screens` (empty means the global `screens
 - `bar.position` - `left` (default) or `right`
 - `bar.logo` - Show the NixOS logo at the top of the bar (default: true)
 - `bar.screens` - Monitors that get the bar. Empty (default) means every screen that has the frame. The other screens keep the border without the bar.
+- `usage.enable` - AI usage panel and its bot button (default: false)
+- `usage.claude` - Show the Claude Code limits (default: true)
+- `usage.opencode` - Show the OpenCode usage (default: true)
+- `usage.interval` - Refresh interval of the OpenCode numbers in milliseconds (default: 60000)
+- `session.enable` - Session menu (default: true)
+- `session.commands.{lock,logout,suspend,reboot,shutdown}` - Commands of the buttons. Empty hides a button. Defaults use absolute paths (`systemctl`, `hyprctl`, `quickshell-lock`).
 - `launcher.enable` - Application launcher (default: true)
 - `launcher.terminal` - Terminal for applications that run in a terminal, called as `terminal -e command` (default: `kitty`)
 - `launcher.rows` - Maximum number of results shown (default: 8)

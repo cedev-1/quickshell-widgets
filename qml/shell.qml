@@ -107,6 +107,20 @@ ShellRoot {
             barLogo: root.text("FRAME_BAR_LOGO", "1") !== "0"
             barPosition: root.text("FRAME_BAR_POSITION", "left")
             barScreens: root.csv("FRAME_BAR_SCREENS")
+            usageEnabled: root.text("FRAME_USAGE", "0") === "1"
+            usageClaude: root.text("FRAME_USAGE_CLAUDE", "1") !== "0"
+            usageOpencode: root.text("FRAME_USAGE_OPENCODE", "1") !== "0"
+            usageClaudeFile: root.text("FRAME_USAGE_CLAUDE_FILE", Quickshell.env("HOME") + "/.cache/quickshell-usage/claude.json")
+            usageOpencodeDb: root.text("FRAME_USAGE_OPENCODE_DB", Quickshell.env("HOME") + "/.local/share/opencode/opencode.db")
+            usageInterval: root.number("FRAME_USAGE_INTERVAL", 60000)
+            sessionEnabled: root.text("FRAME_SESSION", "1") !== "0"
+            sessionCommands: ({
+                lock: root.text("FRAME_SESSION_LOCK", ""),
+                logout: root.text("FRAME_SESSION_LOGOUT", ""),
+                suspend: root.text("FRAME_SESSION_SUSPEND", ""),
+                reboot: root.text("FRAME_SESSION_REBOOT", ""),
+                shutdown: root.text("FRAME_SESSION_SHUTDOWN", "")
+            })
             launcherEnabled: root.text("FRAME_LAUNCHER", "1") !== "0"
             launcherTerminal: root.text("FRAME_LAUNCHER_TERMINAL", "kitty")
             launcherRows: root.number("FRAME_LAUNCHER_ROWS", 8)

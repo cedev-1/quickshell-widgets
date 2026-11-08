@@ -40,10 +40,21 @@ PanelWindow {
     property real launcherDepth: launcherTarget
     readonly property real launcherLeft: (holeLeft + holeRight) / 2 - launcherWidth / 2
 
+    readonly property bool sessionOpen: controller.sessionEnabled && controller.sessionScreen === modelData.name
+    readonly property bool sessionOnRight: !barRight
+    readonly property real sessionPad: 16 * unit
+    readonly property real sessionWidth: sessionLoader.implicitWidth + sessionPad * 2
+    readonly property real sessionHeight: sessionLoader.implicitHeight + sessionPad * 2
+    readonly property real sessionTop: (edge + holeBottom) / 2 - sessionHeight / 2
+    property real sessionDepth: sessionOpen ? sessionWidth : 0
+    readonly property bool overlayOpen: launcherOpen || sessionOpen
+
     readonly property real notifPad: 16 * unit
     readonly property real notifWidth: 360 * unit + notifPad * 2
-    readonly property real notifTarget: Math.min(notifColumn.implicitHeight + notifPad * 2, content.height * 0.55)
-    readonly property bool notifShow: onFocusedScreen && !controller.doNotDisturb && controller.notificationList.length > 0
+    readonly property bool usageOpen: controller.usageEnabled && controller.usageScreen === modelData.name
+    property bool usageVisible: false
+    readonly property real notifTarget: Math.min((usageVisible ? usageLoader.implicitHeight : notifColumn.implicitHeight) + notifPad * 2, content.height * 0.55)
+    readonly property bool notifShow: usageOpen || (onFocusedScreen && !controller.doNotDisturb && controller.notificationList.length > 0)
     property real notifHeight: 0
     property real notifDepth: 0
     readonly property real notifBottom: content.height - 90 * unit
@@ -93,6 +104,21 @@ PanelWindow {
 
         d += hline(right - R);
         d += arc(R, right, T + R, 1);
+
+        if (sessionDepth > 0.5 && sessionHeight > 1) {
+            var sd = sessionDepth, sh = sessionHeight;
+            var sy = (T + bottom) / 2 - sh / 2;
+            var sf = Math.min(R, sd / 2, sh / 2);
+
+            d += " V" + (sy - sf);
+            d += arc(sf, right - sf, sy, 1);
+            d += hline(right - sd + sf);
+            d += arc(sf, right - sd, sy + sf, 0);
+            d += " V" + (sy + sh - sf);
+            d += arc(sf, right - sd + sf, sy + sh, 0);
+            d += hline(right - sf);
+            d += arc(sf, right, sy + sh + sf, 1);
+        }
         d += " V" + (bottom - R);
         d += arc(R, right - R, bottom, 1);
 
@@ -146,7 +172,7 @@ PanelWindow {
     WlrLayershell.namespace: "quickshell-frame"
     WlrLayershell.layer: WlrLayer.Top
     WlrLayershell.exclusionMode: ExclusionMode.Ignore
-    WlrLayershell.keyboardFocus: launcherOpen ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+    WlrLayershell.keyboardFocus: overlayOpen ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
     Timer {
         id: grabDelay
@@ -154,19 +180,22 @@ PanelWindow {
         property bool grabReady: false
 
         interval: 250
-        running: win.launcherOpen
+        running: win.overlayOpen
         onTriggered: grabReady = true
     }
 
-    onLauncherOpenChanged: {
-        if (!launcherOpen)
+    onOverlayOpenChanged: {
+        if (!overlayOpen)
             grabDelay.grabReady = false;
     }
 
     HyprlandFocusGrab {
         windows: [win]
-        active: win.launcherOpen && grabDelay.grabReady
-        onCleared: win.controller.closeLauncher()
+        active: win.overlayOpen && grabDelay.grabReady
+        onCleared: {
+            win.controller.closeLauncher();
+            win.controller.closeSession();
+        }
     }
 
     mask: Region {
@@ -181,6 +210,7 @@ PanelWindow {
         Region { item: panelArea }
         Region { item: notifArea }
         Region { item: launcherArea }
+        Region { item: sessionArea }
     }
 
     NumberAnimation {
@@ -190,6 +220,18 @@ PanelWindow {
         property: "notifDepth"
         duration: 300
         easing.type: Easing.OutCubic
+    }
+
+    onUsageOpenChanged: {
+        if (usageOpen)
+            usageVisible = true;
+        else if (notifShow)
+            usageVisible = false;
+    }
+
+    onNotifDepthChanged: {
+        if (notifDepth <= 0.5 && !usageOpen)
+            usageVisible = false;
     }
 
     onNotifShowChanged: {
@@ -206,6 +248,10 @@ PanelWindow {
     }
 
     Behavior on depth {
+        NumberAnimation { duration: 300; easing.type: Easing.OutCubic }
+    }
+
+    Behavior on sessionDepth {
         NumberAnimation { duration: 300; easing.type: Easing.OutCubic }
     }
 
@@ -247,6 +293,10 @@ PanelWindow {
         FrameBar {
             visible: win.hasBar
             showLogo: win.controller.barLogo
+            showUsage: win.controller.usageEnabled
+            onUsageRequested: win.controller.toggleUsage(win.modelData.name)
+            showPower: win.controller.sessionEnabled
+            onPowerRequested: win.controller.toggleSession(win.modelData.name)
             x: win.barRight ? parent.width - win.barWidth : 0
             y: 0
             width: win.barWidth
@@ -286,6 +336,8 @@ PanelWindow {
             Column {
                 id: notifColumn
 
+                visible: !win.usageVisible
+
                 x: win.barRight ? win.notifPad + (win.notifWidth - win.notifDepth) : win.notifPad - (win.notifWidth - win.notifDepth)
                 y: win.notifPad
                 spacing: 8 * win.unit
@@ -299,6 +351,24 @@ PanelWindow {
                         fontFamily: win.controller.fontFamily
                         defaultTimeout: win.controller.notificationTimeout
                     }
+                }
+            }
+
+            Loader {
+                id: usageLoader
+
+                x: win.barRight ? win.notifPad + (win.notifWidth - win.notifDepth) : win.notifPad - (win.notifWidth - win.notifDepth)
+                y: win.notifPad
+                active: win.usageVisible
+
+                sourceComponent: FrameUsage {
+                    unit: win.unit
+                    fontFamily: win.controller.fontFamily
+                    claudeFile: win.controller.usageClaudeFile
+                    opencodeDb: win.controller.usageOpencodeDb
+                    showClaude: win.controller.usageClaude
+                    showOpencode: win.controller.usageOpencode
+                    interval: win.controller.usageInterval
                 }
             }
         }
@@ -331,6 +401,32 @@ PanelWindow {
             }
         }
 
+        Item {
+            x: win.sessionOnRight ? win.holeRight - win.sessionDepth : win.holeLeft
+            y: win.sessionTop
+            width: win.sessionDepth
+            height: win.sessionHeight
+            clip: true
+            visible: win.sessionDepth > 1
+
+            Loader {
+                id: sessionLoader
+
+                x: win.sessionOnRight ? win.sessionPad + (win.sessionWidth - win.sessionDepth) : win.sessionPad - (win.sessionWidth - win.sessionDepth)
+                y: win.sessionPad
+                active: win.sessionOpen || win.sessionDepth > 1
+
+                sourceComponent: FrameSession {
+                    unit: win.unit
+                    fontFamily: win.controller.fontFamily
+                    cornerRadius: Math.round(win.rounding * 0.6)
+                    commands: win.controller.sessionCommands
+
+                    onCloseRequested: win.controller.closeSession()
+                }
+            }
+        }
+
         Item { id: leftArea; x: 0; y: 0; width: win.leftInset; height: parent.height }
         Item { id: rightArea; x: parent.width - win.rightInset; y: 0; width: win.rightInset; height: parent.height }
         Item { id: topArea; x: win.leftInset; y: 0; width: parent.width - win.leftInset - win.rightInset; height: win.edge }
@@ -341,6 +437,7 @@ PanelWindow {
         Item { id: cornerBottomRight; x: win.holeRight - win.rounding; y: win.holeBottom - win.rounding; width: win.rounding; height: win.rounding }
         Item { id: notifArea; x: win.barRight ? win.holeRight - win.notifDepth : win.holeLeft; y: win.notifTop; width: win.notifDepth; height: win.notifHeight }
         Item { id: launcherArea; x: win.launcherLeft; y: win.holeBottom - win.launcherDepth; width: win.launcherWidth; height: win.launcherDepth + win.edge }
+        Item { id: sessionArea; x: win.sessionOnRight ? win.holeRight - win.sessionDepth : win.holeLeft; y: win.sessionTop; width: win.sessionDepth; height: win.sessionHeight }
 
         Item {
             id: panelArea

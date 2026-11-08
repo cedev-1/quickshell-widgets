@@ -23,12 +23,22 @@ Scope {
     property bool launcherEnabled: true
     property string launcherTerminal: "kitty"
     property int launcherRows: 8
+    property bool sessionEnabled: true
+    property var sessionCommands: ({})
+    property bool usageEnabled: false
+    property bool usageClaude: true
+    property bool usageOpencode: true
+    property string usageClaudeFile: ""
+    property string usageOpencodeDb: ""
+    property int usageInterval: 60000
     property bool notificationsEnabled: true
     property int notificationTimeout: 5000
     property int maxNotifications: 4
 
     property string dashboardScreen: ""
     property string launcherScreen: ""
+    property string sessionScreen: ""
+    property string usageScreen: ""
     property bool dashboardByHover: false
     property bool doNotDisturb: false
 
@@ -82,6 +92,33 @@ Scope {
             openLauncher(name);
     }
 
+    function openSession(screenName: string): void {
+        sessionScreen = screenName;
+    }
+
+    function closeSession(): void {
+        sessionScreen = "";
+    }
+
+    function toggleSession(screenName: string): void {
+        if (sessionScreen === screenName)
+            closeSession();
+        else
+            openSession(screenName);
+    }
+
+    function toggleSessionOnFocused(): void {
+        toggleSession(Hyprland.focusedMonitor?.name ?? "");
+    }
+
+    function toggleUsage(screenName: string): void {
+        usageScreen = usageScreen === screenName ? "" : screenName;
+    }
+
+    function closeUsage(): void {
+        usageScreen = "";
+    }
+
     function clearNotifications(): void {
         var server = serverLoader.item;
         if (!server)
@@ -126,6 +163,22 @@ Scope {
 
         function closeLauncher(): void {
             root.closeLauncher();
+        }
+
+        function toggleSession(): void {
+            root.toggleSessionOnFocused();
+        }
+
+        function closeSession(): void {
+            root.closeSession();
+        }
+
+        function toggleUsage(): void {
+            root.toggleUsage(Hyprland.focusedMonitor?.name ?? "");
+        }
+
+        function closeUsage(): void {
+            root.closeUsage();
         }
 
         function clearNotifications(): void {

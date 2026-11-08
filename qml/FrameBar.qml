@@ -9,7 +9,12 @@ Item {
 
     property real unit: 1
     property bool showLogo: true
+    property bool showPower: false
+    property bool showUsage: false
     property string fontFamily: "JetBrainsMono Nerd Font"
+
+    signal powerRequested
+    signal usageRequested
 
     readonly property int activeWorkspace: Hyprland.focusedWorkspace?.id ?? -1
 
@@ -94,7 +99,67 @@ Item {
         }
     }
 
+    Rectangle {
+        visible: root.showUsage
+        anchors.bottom: root.showPower ? powerButton.top : timeColumn.top
+        anchors.bottomMargin: 14 * root.unit
+        anchors.horizontalCenter: parent.horizontalCenter
+        width: 34 * root.unit
+        height: width
+        radius: width / 2
+        color: usageArea.containsMouse ? "#26ffffff" : "transparent"
+
+        Text {
+            anchors.centerIn: parent
+            text: "󰚩"
+            font.family: root.fontFamily
+            font.pixelSize: 18 * root.unit
+            color: "#ffffff"
+        }
+
+        MouseArea {
+            id: usageArea
+
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: root.usageRequested()
+        }
+    }
+
+    Rectangle {
+        id: powerButton
+
+        visible: root.showPower
+        anchors.bottom: timeColumn.top
+        anchors.bottomMargin: 14 * root.unit
+        anchors.horizontalCenter: parent.horizontalCenter
+        width: 34 * root.unit
+        height: width
+        radius: width / 2
+        color: powerArea.containsMouse ? "#26ffffff" : "transparent"
+
+        Text {
+            anchors.centerIn: parent
+            text: ""
+            font.family: root.fontFamily
+            font.pixelSize: 16 * root.unit
+            color: "#ffffff"
+        }
+
+        MouseArea {
+            id: powerArea
+
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: root.powerRequested()
+        }
+    }
+
     Column {
+        id: timeColumn
+
         anchors.bottom: parent.bottom
         anchors.bottomMargin: 14 * root.unit
         anchors.horizontalCenter: parent.horizontalCenter

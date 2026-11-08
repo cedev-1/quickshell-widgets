@@ -21,6 +21,29 @@
       lock = pkgs.writeShellScriptBin "quickshell-lock" ''
         exec ${pkgs.quickshell}/bin/quickshell ipc -p ${mkConfig pkgs} call lock lock
       '';
+      usage = pkgs.writeShellScriptBin "quickshell-usage" ''
+        exec ${pkgs.quickshell}/bin/quickshell ipc -p ${mkConfig pkgs} call frame toggleUsage
+      '';
+      session = pkgs.writeShellScriptBin "quickshell-session" ''
+        exec ${pkgs.quickshell}/bin/quickshell ipc -p ${mkConfig pkgs} call frame toggleSession
+      '';
+      claude-usage-hook = pkgs.writeShellApplication {
+        name = "quickshell-claude-usage";
+        runtimeInputs = [ pkgs.jq pkgs.coreutils ];
+        text = ''
+          dir="''${XDG_CACHE_HOME:-$HOME/.cache}/quickshell-usage"
+          input="$(cat)"
+
+          if printf '%s' "$input" | jq -e '.rate_limits.five_hour // .rate_limits.seven_day' >/dev/null 2>&1; then
+            mkdir -p "$dir"
+            tmp="$(mktemp "$dir/.claude.XXXXXX")"
+            printf '%s' "$input" | jq -c --argjson now "$(date +%s)" '{updated: $now, five_hour: (.rate_limits.five_hour // null), seven_day: (.rate_limits.seven_day // null)}' > "$tmp"
+            mv "$tmp" "$dir/claude.json"
+          fi
+
+          printf '%s' "$input" | jq -r '[(.rate_limits.five_hour.used_percentage // empty | "5h \(floor)%"), (.rate_limits.seven_day.used_percentage // empty | "7d \(floor)%")] | join(" · ")'
+        '';
+      };
       launcher = pkgs.writeShellScriptBin "quickshell-launcher" ''
         exec ${pkgs.quickshell}/bin/quickshell ipc -p ${mkConfig pkgs} call frame toggleLauncher
       '';
@@ -244,6 +267,66 @@
               description = "Maximum number of results shown";
             };
           };
+          session = {
+            enable = mkOption {
+              type = types.bool;
+              default = true;
+              description = "Session menu (lock, logout, sleep, reboot, shutdown) that slides out of the side opposite to the bar. Open it with the power button of the bar or the quickshell-session command.";
+            };
+            commands = {
+              lock = mkOption {
+                type = types.str;
+                default = lib.optionalString cfg.lock.enable "${self.packages.${pkgs.stdenv.hostPlatform.system}.lock}/bin/quickshell-lock";
+                defaultText = literalExpression "the quickshell-lock command when `lock.enable` is set, empty otherwise";
+                description = "Command run by the lock button. Empty hides the button.";
+              };
+              logout = mkOption {
+                type = types.str;
+                default = "/run/current-system/sw/bin/hyprctl dispatch 'hl.dsp.exit()'";
+                description = "Command run by the logout button. Empty hides the button.";
+              };
+              suspend = mkOption {
+                type = types.str;
+                default = "${config.systemd.package}/bin/systemctl suspend";
+                defaultText = literalExpression "systemctl suspend";
+                description = "Command run by the sleep button. Empty hides the button.";
+              };
+              reboot = mkOption {
+                type = types.str;
+                default = "${config.systemd.package}/bin/systemctl reboot";
+                defaultText = literalExpression "systemctl reboot";
+                description = "Command run by the reboot button. Empty hides the button.";
+              };
+              shutdown = mkOption {
+                type = types.str;
+                default = "${config.systemd.package}/bin/systemctl poweroff";
+                defaultText = literalExpression "systemctl poweroff";
+                description = "Command run by the shutdown button. Empty hides the button.";
+              };
+            };
+          };
+          usage = {
+            enable = mkOption {
+              type = types.bool;
+              default = false;
+              description = "AI usage panel: a bot button above the clock opens a panel with the Claude Code limits (5 hours and week) and the OpenCode usage. Open it with the button or the quickshell-usage command.";
+            };
+            claude = mkOption {
+              type = types.bool;
+              default = true;
+              description = "Show the Claude Code limits. They come from the statusline of Claude Code (Pro/Max plans only): add `statusLine = { type = \"command\"; command = \"quickshell-claude-usage\"; }` to ~/.claude/settings.json.";
+            };
+            opencode = mkOption {
+              type = types.bool;
+              default = true;
+              description = "Show the OpenCode cost and tokens, read from its local database (~/.local/share/opencode/opencode.db) with sqlite3.";
+            };
+            interval = mkOption {
+              type = types.ints.positive;
+              default = 60000;
+              description = "Refresh interval of the OpenCode numbers in milliseconds, while the panel is open";
+            };
+          };
           screens = screensOption;
         };
       };
@@ -252,6 +335,9 @@
         environment.systemPackages = [ pkgs.quickshell ]
           ++ lib.optional cfg.lock.enable self.packages.${pkgs.stdenv.hostPlatform.system}.lock
           ++ lib.optional (cfg.frame.enable && cfg.frame.launcher.enable) self.packages.${pkgs.stdenv.hostPlatform.system}.launcher
+          ++ lib.optional (cfg.frame.enable && cfg.frame.session.enable) self.packages.${pkgs.stdenv.hostPlatform.system}.session
+          ++ lib.optional (cfg.frame.enable && cfg.frame.usage.enable) self.packages.${pkgs.stdenv.hostPlatform.system}.usage
+          ++ lib.optional (cfg.frame.enable && cfg.frame.usage.enable && cfg.frame.usage.claude) self.packages.${pkgs.stdenv.hostPlatform.system}.claude-usage-hook
           ++ lib.optional cfg.frame.enable self.packages.${pkgs.stdenv.hostPlatform.system}.dashboard
           ++ lib.optional (cfg.frame.enable && cfg.frame.notifications.enable) self.packages.${pkgs.stdenv.hostPlatform.system}.dnd;
 
@@ -263,6 +349,7 @@
           partOf = [ "graphical-session.target" ];
           after = [ "graphical-session.target" ];
           path = [ pkgs.coreutils pkgs.bash ]
+            ++ lib.optional (cfg.frame.enable && cfg.frame.usage.enable && cfg.frame.usage.opencode) pkgs.sqlite
             ++ lib.optional ((cfg.stats.enable && cfg.stats.gpu) || (cfg.frame.enable && cfg.frame.gpu)) config.hardware.nvidia.package.bin;
           environment = {
             QS_COMPONENTS = csv enabled;
@@ -302,6 +389,16 @@
             FRAME_BAR_POSITION = cfg.frame.bar.position;
             FRAME_BAR_LOGO = if cfg.frame.bar.logo then "1" else "0";
             FRAME_BAR_SCREENS = csv cfg.frame.bar.screens;
+            FRAME_USAGE = if cfg.frame.enable && cfg.frame.usage.enable then "1" else "0";
+            FRAME_USAGE_CLAUDE = if cfg.frame.usage.claude then "1" else "0";
+            FRAME_USAGE_OPENCODE = if cfg.frame.usage.opencode then "1" else "0";
+            FRAME_USAGE_INTERVAL = toString cfg.frame.usage.interval;
+            FRAME_SESSION = if cfg.frame.session.enable then "1" else "0";
+            FRAME_SESSION_LOCK = cfg.frame.session.commands.lock;
+            FRAME_SESSION_LOGOUT = cfg.frame.session.commands.logout;
+            FRAME_SESSION_SUSPEND = cfg.frame.session.commands.suspend;
+            FRAME_SESSION_REBOOT = cfg.frame.session.commands.reboot;
+            FRAME_SESSION_SHUTDOWN = cfg.frame.session.commands.shutdown;
             FRAME_LAUNCHER = if cfg.frame.launcher.enable then "1" else "0";
             FRAME_LAUNCHER_TERMINAL = cfg.frame.launcher.terminal;
             FRAME_LAUNCHER_ROWS = toString cfg.frame.launcher.rows;
