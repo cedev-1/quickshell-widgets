@@ -6,6 +6,8 @@ Quickshell components for Hyprland on NixOS, all in one flake. Enable only the o
 - **stats**: CPU (with temperature), RAM, disk and optional NVIDIA GPU/VRAM, read from `/proc`, `df`, `/sys/class/hwmon` and `nvidia-smi`.
 - **header**: floating header with three rounded islands: active window title, workspaces and date/time. Requires the Lua dispatch syntax (Hyprland >= 0.55).
 - **lock**: lock screen with a blurred wallpaper, a big clock and a password field (password only, authenticated through PAM). Inspired by the lock screen of Caelestia, without weather, fingerprint or Howdy.
+- **launcher**: application launcher with search, keyboard navigation and icons, drawn on the focused screen.
+- **frame**: Caelestia-style screen frame. A vertical bar on the left (logo, workspaces, time), a rounded border around the screen, a dashboard (calendar, clock, system stats) that slides from the top edge and notifications that slide out of the bar. Replaces Waybar, the header and the notification daemon.
 
 All components run in a single Quickshell process.
 
@@ -64,6 +66,13 @@ services.quickshell-widgets = {
     gpu = true;
   };
 
+  launcher.enable = true;
+
+  frame = {
+    enable = true;
+    gpu = true;
+  };
+
   lock = {
     enable = true;
     wallpaper = ./wall.png;
@@ -110,6 +119,34 @@ quickshell ipc -p ./qml call lock lock
 
 `LOCK_AUTOUNLOCK` is meant for testing only and is not exposed as a NixOS option.
 
+## Launcher
+
+Enabling `launcher` installs the `quickshell-launcher` command, which toggles the launcher. Bind it to a key, for example to replace rofi in a Lua Hyprland config:
+
+```lua
+hl.bind("SUPER + R", hl.dsp.exec_cmd("quickshell-launcher"))
+```
+
+Type to search (name, generic name, comment and keywords), `Up`/`Down` or `Ctrl+J`/`Ctrl+K` (also `Ctrl+N`/`Ctrl+P`) to move, `Enter` to launch and `Esc` to close. Applications that run in a terminal are started with the configured `terminal`.
+
+## Frame
+
+The frame is one transparent window per screen that draws the bar and the border as a single shape. Panels attach to the border with rounded, concave junctions, like in Caelestia. It reserves space on all four edges, so disable any other bar (Waybar, the header) and reduce `gaps_out` in your Hyprland config to keep the windows snug against the border.
+
+The dashboard opens when the pointer touches the top edge (`hover`) and closes when it leaves. You can also bind the `quickshell-dashboard` command, which toggles it on the focused screen:
+
+```lua
+hl.bind("SUPER + D", hl.dsp.exec_cmd("quickshell-dashboard"))
+```
+
+### Notifications
+
+The frame is also a notification daemon (`org.freedesktop.Notifications`). Notifications appear in a panel attached to the right side of the bar, above the clock, with the same rounded junctions as the dashboard. Up to four are shown, newest first, with icon, title, body (markup) and action buttons. Click a notification to dismiss it. They expire after `notifications.timeout` (critical ones stay until dismissed) and the timer pauses while the pointer is over them.
+
+Only one daemon can own the notification name on D-Bus, so disable the previous one (for example `services.mako.enable = false`) or set `frame.notifications.enable = false`.
+
+The `quickshell-dnd` command toggles do-not-disturb, which hides the panel. To dismiss everything: `quickshell ipc -p <config> call frame clearNotifications`.
+
 ## Options
 
 Global:
@@ -140,6 +177,23 @@ Every component also has `enable` and `screens` (empty means the global `screens
 - `blur` - Blur the wallpaper (default: true)
 - `rounding` - Corner radius of the password field in pixels (default: 10)
 - `font` - Font family (default: `JetBrainsMono Nerd Font`)
+
+`launcher`:
+- `fontSize` - Text size in pixels (default: 14). The launcher scales with it.
+- `rounding` - Corner radius in pixels (default: 10)
+- `font` - Font family (default: `JetBrainsMono Nerd Font`)
+- `terminal` - Terminal for applications that run in a terminal, called as `terminal -e command` (default: `kitty`)
+- `rows` - Maximum number of results shown (default: 8)
+
+`frame`:
+- `fontSize` - Base text size in pixels (default: 14). The whole frame scales with it.
+- `thickness` - Border thickness on the top, right and bottom edges (default: 10)
+- `rounding` - Radius of the rounded corners (default: 24)
+- `font` - Font family (default: `JetBrainsMono Nerd Font`)
+- `gpu` - Show NVIDIA GPU and VRAM in the dashboard (default: false)
+- `hover` - Open the dashboard when the pointer touches the top edge (default: true)
+- `notifications.enable` - Use the frame as the notification daemon (default: true)
+- `notifications.timeout` - Display time in milliseconds (default: 5000)
 
 The CPU temperature is read from the first `k10temp`, `coretemp` or `zenpower` sensor. The header is drawn above windows and reserves screen space, so disable any other bar placed on the same edge.
 

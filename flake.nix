@@ -21,6 +21,15 @@
       lock = pkgs.writeShellScriptBin "quickshell-lock" ''
         exec ${pkgs.quickshell}/bin/quickshell ipc -p ${mkConfig pkgs} call lock lock
       '';
+      launcher = pkgs.writeShellScriptBin "quickshell-launcher" ''
+        exec ${pkgs.quickshell}/bin/quickshell ipc -p ${mkConfig pkgs} call launcher toggle
+      '';
+      dashboard = pkgs.writeShellScriptBin "quickshell-dashboard" ''
+        exec ${pkgs.quickshell}/bin/quickshell ipc -p ${mkConfig pkgs} call frame toggleDashboard
+      '';
+      dnd = pkgs.writeShellScriptBin "quickshell-dnd" ''
+        exec ${pkgs.quickshell}/bin/quickshell ipc -p ${mkConfig pkgs} call frame toggleDoNotDisturb
+      '';
       default = pkgs.writeShellScriptBin "quickshell-widgets" ''
         export PATH=${pkgs.lib.makeBinPath [ pkgs.coreutils pkgs.bash ]}:$PATH
         exec ${pkgs.quickshell}/bin/quickshell -p ${mkConfig pkgs} "$@"
@@ -51,7 +60,7 @@
         description = "Monitors for this component (see `hyprctl monitors`). Empty means the global `screens` option.";
       };
 
-      enabled = lib.filter (name: cfg.${name}.enable) [ "clock" "stats" "header" "lock" ];
+      enabled = lib.filter (name: cfg.${name}.enable) [ "clock" "stats" "header" "lock" "launcher" "frame" ];
       csv = lib.concatStringsSep ",";
     in {
       options.services.quickshell-widgets = with lib; {
@@ -150,11 +159,90 @@
             description = "Font family used on the lock screen";
           };
         };
+
+        launcher = {
+          enable = mkEnableOption "the application launcher (toggle it with the quickshell-launcher command)";
+          fontSize = mkOption {
+            type = types.ints.positive;
+            default = 14;
+            description = "Text size in pixels (the launcher scales with it)";
+          };
+          rounding = mkOption {
+            type = types.ints.unsigned;
+            default = 10;
+            description = "Corner radius in pixels";
+          };
+          font = mkOption {
+            type = types.str;
+            default = "JetBrainsMono Nerd Font";
+            description = "Font family used in the launcher";
+          };
+          terminal = mkOption {
+            type = types.str;
+            default = "kitty";
+            description = "Terminal used for applications that run in a terminal (called as `terminal -e command`)";
+          };
+          rows = mkOption {
+            type = types.ints.positive;
+            default = 8;
+            description = "Maximum number of results shown";
+          };
+        };
+
+        frame = {
+          enable = mkEnableOption "the screen frame: vertical bar on the left, rounded border and a dashboard that slides from the top";
+          fontSize = mkOption {
+            type = types.ints.positive;
+            default = 14;
+            description = "Base text size in pixels (the whole frame scales with it)";
+          };
+          thickness = mkOption {
+            type = types.ints.positive;
+            default = 10;
+            description = "Thickness of the border on the top, right and bottom edges, in pixels";
+          };
+          rounding = mkOption {
+            type = types.ints.positive;
+            default = 24;
+            description = "Radius of the rounded corners, in pixels";
+          };
+          font = mkOption {
+            type = types.str;
+            default = "JetBrainsMono Nerd Font";
+            description = "Font family used in the frame";
+          };
+          gpu = mkOption {
+            type = types.bool;
+            default = false;
+            description = "Show NVIDIA GPU and VRAM usage in the dashboard (requires hardware.nvidia)";
+          };
+          hover = mkOption {
+            type = types.bool;
+            default = true;
+            description = "Open the dashboard when the pointer touches the top edge";
+          };
+          notifications = {
+            enable = mkOption {
+              type = types.bool;
+              default = true;
+              description = "Use the frame as the notification daemon. Disable any other daemon (for example mako) first, only one can own the D-Bus name.";
+            };
+            timeout = mkOption {
+              type = types.ints.unsigned;
+              default = 5000;
+              description = "Display time in milliseconds for notifications that do not set one. Critical notifications stay until dismissed.";
+            };
+          };
+          screens = screensOption;
+        };
       };
 
       config = lib.mkIf cfg.enable {
         environment.systemPackages = [ pkgs.quickshell ]
-          ++ lib.optional cfg.lock.enable self.packages.${pkgs.stdenv.hostPlatform.system}.lock;
+          ++ lib.optional cfg.lock.enable self.packages.${pkgs.stdenv.hostPlatform.system}.lock
+          ++ lib.optional cfg.launcher.enable self.packages.${pkgs.stdenv.hostPlatform.system}.launcher
+          ++ lib.optional cfg.frame.enable self.packages.${pkgs.stdenv.hostPlatform.system}.dashboard
+          ++ lib.optional (cfg.frame.enable && cfg.frame.notifications.enable) self.packages.${pkgs.stdenv.hostPlatform.system}.dnd;
 
         security.pam.services.quickshell-lock = lib.mkIf cfg.lock.enable { };
 
@@ -164,7 +252,7 @@
           partOf = [ "graphical-session.target" ];
           after = [ "graphical-session.target" ];
           path = [ pkgs.coreutils pkgs.bash ]
-            ++ lib.optional (cfg.stats.enable && cfg.stats.gpu) config.hardware.nvidia.package.bin;
+            ++ lib.optional ((cfg.stats.enable && cfg.stats.gpu) || (cfg.frame.enable && cfg.frame.gpu)) config.hardware.nvidia.package.bin;
           environment = {
             QS_COMPONENTS = csv enabled;
             QS_SCREENS = csv cfg.screens;
@@ -190,6 +278,22 @@
             LOCK_BLUR = if cfg.lock.blur then "1" else "0";
             LOCK_RADIUS = toString cfg.lock.rounding;
             LOCK_FONT = cfg.lock.font;
+
+            LAUNCHER_FONT_SIZE = toString cfg.launcher.fontSize;
+            LAUNCHER_RADIUS = toString cfg.launcher.rounding;
+            LAUNCHER_FONT = cfg.launcher.font;
+            LAUNCHER_TERMINAL = cfg.launcher.terminal;
+            LAUNCHER_ROWS = toString cfg.launcher.rows;
+
+            FRAME_FONT_SIZE = toString cfg.frame.fontSize;
+            FRAME_THICKNESS = toString cfg.frame.thickness;
+            FRAME_ROUNDING = toString cfg.frame.rounding;
+            FRAME_FONT = cfg.frame.font;
+            FRAME_GPU = if cfg.frame.gpu then "1" else "0";
+            FRAME_HOVER = if cfg.frame.hover then "1" else "0";
+            FRAME_SCREENS = csv cfg.frame.screens;
+            FRAME_NOTIFICATIONS = if cfg.frame.notifications.enable then "1" else "0";
+            FRAME_NOTIFICATION_TIMEOUT = toString cfg.frame.notifications.timeout;
           };
           serviceConfig = {
             ExecStart = "${pkgs.quickshell}/bin/quickshell -p ${mkConfig pkgs}";

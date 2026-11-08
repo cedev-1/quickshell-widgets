@@ -91,4 +91,32 @@ ShellRoot {
             autoUnlock: root.number("LOCK_AUTOUNLOCK", 0)
         }
     }
+
+    LazyLoader {
+        active: root.components.indexOf("launcher") >= 0
+
+        Launcher {
+            fontSize: root.number("LAUNCHER_FONT_SIZE", 14)
+            cornerRadius: root.number("LAUNCHER_RADIUS", 10)
+            fontFamily: root.text("LAUNCHER_FONT", "JetBrainsMono Nerd Font")
+            terminal: root.text("LAUNCHER_TERMINAL", "kitty")
+            rows: root.number("LAUNCHER_ROWS", 8)
+        }
+    }
+
+    LazyLoader {
+        active: root.components.indexOf("frame") >= 0
+
+        Frame {
+            targetScreens: root.screensFor("FRAME")
+            fontSize: root.number("FRAME_FONT_SIZE", 14)
+            thickness: root.number("FRAME_THICKNESS", 10)
+            rounding: root.number("FRAME_ROUNDING", 24)
+            fontFamily: root.text("FRAME_FONT", "JetBrainsMono Nerd Font")
+            gpu: root.text("FRAME_GPU", "0") === "1"
+            hoverOpen: root.text("FRAME_HOVER", "1") !== "0"
+            notificationsEnabled: root.text("FRAME_NOTIFICATIONS", "1") !== "0"
+            notificationTimeout: root.number("FRAME_NOTIFICATION_TIMEOUT", 5000)
+        }
+    }
 }
