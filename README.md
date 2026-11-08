@@ -6,8 +6,7 @@ Quickshell components for Hyprland on NixOS, all in one flake. Enable only the o
 - **stats**: CPU (with temperature), RAM, disk and optional NVIDIA GPU/VRAM, read from `/proc`, `df`, `/sys/class/hwmon` and `nvidia-smi`.
 - **header**: floating header with three rounded islands: active window title, workspaces and date/time. Requires the Lua dispatch syntax (Hyprland >= 0.55).
 - **lock**: lock screen with a blurred wallpaper, a big clock and a password field (password only, authenticated through PAM). Inspired by the lock screen of Caelestia, without weather, fingerprint or Howdy.
-- **launcher**: application launcher with search, keyboard navigation and icons, drawn on the focused screen.
-- **frame**: Caelestia-style screen frame. A vertical bar on the left (logo, workspaces, time), a rounded border around the screen, a dashboard (calendar, clock, system stats) that slides from the top edge and notifications that slide out of the bar. Replaces Waybar, the header and the notification daemon.
+- **frame**: Caelestia-style screen frame. A vertical bar on the left (logo, workspaces, time), a rounded border around the screen, a dashboard (calendar, clock, system stats) that slides from the top edge, an application launcher that slides from the bottom edge and notifications that slide out of the bar. Replaces Waybar, the header, the notification daemon and the launcher.
 
 All components run in a single Quickshell process.
 
@@ -66,8 +65,6 @@ services.quickshell-widgets = {
     gpu = true;
   };
 
-  launcher.enable = true;
-
   frame = {
     enable = true;
     gpu = true;
@@ -119,16 +116,6 @@ quickshell ipc -p ./qml call lock lock
 
 `LOCK_AUTOUNLOCK` is meant for testing only and is not exposed as a NixOS option.
 
-## Launcher
-
-Enabling `launcher` installs the `quickshell-launcher` command, which toggles the launcher. Bind it to a key, for example to replace rofi in a Lua Hyprland config:
-
-```lua
-hl.bind("SUPER + R", hl.dsp.exec_cmd("quickshell-launcher"))
-```
-
-Type to search (name, generic name, comment and keywords), `Up`/`Down` or `Ctrl+J`/`Ctrl+K` (also `Ctrl+N`/`Ctrl+P`) to move, `Enter` to launch and `Esc` to close. Applications that run in a terminal are started with the configured `terminal`.
-
 ## Frame
 
 The frame is one transparent window per screen that draws the bar and the border as a single shape. Panels attach to the border with rounded, concave junctions, like in Caelestia. It reserves space on all four edges, so disable any other bar (Waybar, the header) and reduce `gaps_out` in your Hyprland config to keep the windows snug against the border.
@@ -138,6 +125,16 @@ The dashboard opens when the pointer touches the top edge (`hover`) and closes w
 ```lua
 hl.bind("SUPER + D", hl.dsp.exec_cmd("quickshell-dashboard"))
 ```
+
+### Launcher
+
+The launcher slides from the bottom edge of the focused screen, with the same rounded junctions as the other panels. The search field is at the bottom and the results are above it, the best match closest to the field. Bind the `quickshell-launcher` command, which toggles it, for example to replace rofi in a Lua Hyprland config:
+
+```lua
+hl.bind("SUPER + R", hl.dsp.exec_cmd("quickshell-launcher"))
+```
+
+Type to search (name, generic name, comment and keywords), `Up`/`Down` or `Ctrl+K`/`Ctrl+J` (also `Ctrl+P`/`Ctrl+N`) to move, `Enter` to launch and `Esc` to close. Clicking outside also closes it. Applications that run in a terminal are started with `launcher.terminal`.
 
 ### Choosing where the frame and the bar go
 
@@ -195,13 +192,6 @@ Every component also has `enable` and `screens` (empty means the global `screens
 - `rounding` - Corner radius of the password field in pixels (default: 10)
 - `font` - Font family (default: `JetBrainsMono Nerd Font`)
 
-`launcher`:
-- `fontSize` - Text size in pixels (default: 14). The launcher scales with it.
-- `rounding` - Corner radius in pixels (default: 10)
-- `font` - Font family (default: `JetBrainsMono Nerd Font`)
-- `terminal` - Terminal for applications that run in a terminal, called as `terminal -e command` (default: `kitty`)
-- `rows` - Maximum number of results shown (default: 8)
-
 `frame`:
 - `fontSize` - Base text size in pixels (default: 14). The whole frame scales with it.
 - `thickness` - Border thickness on the top, right and bottom edges (default: 10)
@@ -211,7 +201,11 @@ Every component also has `enable` and `screens` (empty means the global `screens
 - `hover` - Open the dashboard when the pointer touches the top edge (default: true)
 - `bar.enable` - Show the vertical bar (default: true). Without it the frame keeps a thin uniform border.
 - `bar.position` - `left` (default) or `right`
+- `bar.logo` - Show the NixOS logo at the top of the bar (default: true)
 - `bar.screens` - Monitors that get the bar. Empty (default) means every screen that has the frame. The other screens keep the border without the bar.
+- `launcher.enable` - Application launcher (default: true)
+- `launcher.terminal` - Terminal for applications that run in a terminal, called as `terminal -e command` (default: `kitty`)
+- `launcher.rows` - Maximum number of results shown (default: 8)
 - `notifications.enable` - Use the frame as the notification daemon (default: true)
 - `notifications.timeout` - Display time in milliseconds (default: 5000)
 

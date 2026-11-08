@@ -33,6 +33,13 @@ PanelWindow {
     readonly property bool open: controller.dashboardScreen === modelData.name
     property real depth: open ? panelHeight : 0
 
+    readonly property bool launcherOpen: controller.launcherEnabled && controller.launcherScreen === modelData.name
+    readonly property real launcherPad: 16 * unit
+    readonly property real launcherWidth: 640 * unit + launcherPad * 2
+    readonly property real launcherTarget: launcherOpen ? launcherLoader.implicitHeight + launcherPad * 2 : 0
+    property real launcherDepth: launcherTarget
+    readonly property real launcherLeft: (holeLeft + holeRight) / 2 - launcherWidth / 2
+
     readonly property real notifPad: 16 * unit
     readonly property real notifWidth: 360 * unit + notifPad * 2
     readonly property real notifTarget: Math.min(notifColumn.implicitHeight + notifPad * 2, content.height * 0.55)
@@ -88,6 +95,22 @@ PanelWindow {
         d += arc(R, right, T + R, 1);
         d += " V" + (bottom - R);
         d += arc(R, right - R, bottom, 1);
+
+        if (launcherDepth > 0.5) {
+            var ld = launcherDepth;
+            var lx0 = (L + right) / 2 - launcherWidth / 2, lx1 = lx0 + launcherWidth;
+            var lf = Math.min(R, ld / 2);
+            var lp = Math.min(R, ld / 2, launcherWidth / 2);
+
+            d += hline(lx1 + lf);
+            d += arc(lf, lx1, bottom - lf, 1);
+            d += " V" + (bottom - ld + lp);
+            d += arc(lp, lx1 - lp, bottom - ld, 0);
+            d += hline(lx0 + lp);
+            d += arc(lp, lx0, bottom - ld + lp, 0);
+            d += " V" + (bottom - lf);
+            d += arc(lf, lx0 - lf, bottom, 1);
+        }
         d += hline(L + R);
         d += arc(R, L, bottom - R, 1);
 
@@ -123,6 +146,28 @@ PanelWindow {
     WlrLayershell.namespace: "quickshell-frame"
     WlrLayershell.layer: WlrLayer.Top
     WlrLayershell.exclusionMode: ExclusionMode.Ignore
+    WlrLayershell.keyboardFocus: launcherOpen ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+
+    Timer {
+        id: grabDelay
+
+        property bool grabReady: false
+
+        interval: 250
+        running: win.launcherOpen
+        onTriggered: grabReady = true
+    }
+
+    onLauncherOpenChanged: {
+        if (!launcherOpen)
+            grabDelay.grabReady = false;
+    }
+
+    HyprlandFocusGrab {
+        windows: [win]
+        active: win.launcherOpen && grabDelay.grabReady
+        onCleared: win.controller.closeLauncher()
+    }
 
     mask: Region {
         Region { item: leftArea }
@@ -135,6 +180,7 @@ PanelWindow {
         Region { item: cornerBottomRight }
         Region { item: panelArea }
         Region { item: notifArea }
+        Region { item: launcherArea }
     }
 
     NumberAnimation {
@@ -160,6 +206,10 @@ PanelWindow {
     }
 
     Behavior on depth {
+        NumberAnimation { duration: 300; easing.type: Easing.OutCubic }
+    }
+
+    Behavior on launcherDepth {
         NumberAnimation { duration: 300; easing.type: Easing.OutCubic }
     }
 
@@ -196,6 +246,7 @@ PanelWindow {
 
         FrameBar {
             visible: win.hasBar
+            showLogo: win.controller.barLogo
             x: win.barRight ? parent.width - win.barWidth : 0
             y: 0
             width: win.barWidth
@@ -252,6 +303,34 @@ PanelWindow {
             }
         }
 
+        Item {
+            x: win.launcherLeft
+            y: win.holeBottom - win.launcherDepth
+            width: win.launcherWidth
+            height: win.launcherDepth
+            clip: true
+            visible: win.launcherDepth > 1
+
+            Loader {
+                id: launcherLoader
+
+                x: win.launcherPad
+                anchors.bottom: parent.bottom
+                anchors.bottomMargin: win.launcherPad
+                active: win.launcherOpen || win.launcherDepth > 1
+
+                sourceComponent: FrameLauncher {
+                    unit: win.unit
+                    fontFamily: win.controller.fontFamily
+                    cornerRadius: Math.round(win.rounding * 0.6)
+                    terminal: win.controller.launcherTerminal
+                    rows: win.controller.launcherRows
+
+                    onCloseRequested: win.controller.closeLauncher()
+                }
+            }
+        }
+
         Item { id: leftArea; x: 0; y: 0; width: win.leftInset; height: parent.height }
         Item { id: rightArea; x: parent.width - win.rightInset; y: 0; width: win.rightInset; height: parent.height }
         Item { id: topArea; x: win.leftInset; y: 0; width: parent.width - win.leftInset - win.rightInset; height: win.edge }
@@ -261,6 +340,7 @@ PanelWindow {
         Item { id: cornerBottomLeft; x: win.holeLeft; y: win.holeBottom - win.rounding; width: win.rounding; height: win.rounding }
         Item { id: cornerBottomRight; x: win.holeRight - win.rounding; y: win.holeBottom - win.rounding; width: win.rounding; height: win.rounding }
         Item { id: notifArea; x: win.barRight ? win.holeRight - win.notifDepth : win.holeLeft; y: win.notifTop; width: win.notifDepth; height: win.notifHeight }
+        Item { id: launcherArea; x: win.launcherLeft; y: win.holeBottom - win.launcherDepth; width: win.launcherWidth; height: win.launcherDepth + win.edge }
 
         Item {
             id: panelArea

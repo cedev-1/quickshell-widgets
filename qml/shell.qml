@@ -93,18 +93,6 @@ ShellRoot {
     }
 
     LazyLoader {
-        active: root.components.indexOf("launcher") >= 0
-
-        Launcher {
-            fontSize: root.number("LAUNCHER_FONT_SIZE", 14)
-            cornerRadius: root.number("LAUNCHER_RADIUS", 10)
-            fontFamily: root.text("LAUNCHER_FONT", "JetBrainsMono Nerd Font")
-            terminal: root.text("LAUNCHER_TERMINAL", "kitty")
-            rows: root.number("LAUNCHER_ROWS", 8)
-        }
-    }
-
-    LazyLoader {
         active: root.components.indexOf("frame") >= 0
 
         Frame {
@@ -116,8 +104,12 @@ ShellRoot {
             gpu: root.text("FRAME_GPU", "0") === "1"
             hoverOpen: root.text("FRAME_HOVER", "1") !== "0"
             barEnabled: root.text("FRAME_BAR", "1") !== "0"
+            barLogo: root.text("FRAME_BAR_LOGO", "1") !== "0"
             barPosition: root.text("FRAME_BAR_POSITION", "left")
             barScreens: root.csv("FRAME_BAR_SCREENS")
+            launcherEnabled: root.text("FRAME_LAUNCHER", "1") !== "0"
+            launcherTerminal: root.text("FRAME_LAUNCHER_TERMINAL", "kitty")
+            launcherRows: root.number("FRAME_LAUNCHER_ROWS", 8)
             notificationsEnabled: root.text("FRAME_NOTIFICATIONS", "1") !== "0"
             notificationTimeout: root.number("FRAME_NOTIFICATION_TIMEOUT", 5000)
         }

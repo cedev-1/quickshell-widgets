@@ -22,7 +22,7 @@
         exec ${pkgs.quickshell}/bin/quickshell ipc -p ${mkConfig pkgs} call lock lock
       '';
       launcher = pkgs.writeShellScriptBin "quickshell-launcher" ''
-        exec ${pkgs.quickshell}/bin/quickshell ipc -p ${mkConfig pkgs} call launcher toggle
+        exec ${pkgs.quickshell}/bin/quickshell ipc -p ${mkConfig pkgs} call frame toggleLauncher
       '';
       dashboard = pkgs.writeShellScriptBin "quickshell-dashboard" ''
         exec ${pkgs.quickshell}/bin/quickshell ipc -p ${mkConfig pkgs} call frame toggleDashboard
@@ -60,7 +60,7 @@
         description = "Monitors for this component (see `hyprctl monitors`). Empty means the global `screens` option.";
       };
 
-      enabled = lib.filter (name: cfg.${name}.enable) [ "clock" "stats" "header" "lock" "launcher" "frame" ];
+      enabled = lib.filter (name: cfg.${name}.enable) [ "clock" "stats" "header" "lock" "frame" ];
       csv = lib.concatStringsSep ",";
     in {
       options.services.quickshell-widgets = with lib; {
@@ -160,35 +160,6 @@
           };
         };
 
-        launcher = {
-          enable = mkEnableOption "the application launcher (toggle it with the quickshell-launcher command)";
-          fontSize = mkOption {
-            type = types.ints.positive;
-            default = 14;
-            description = "Text size in pixels (the launcher scales with it)";
-          };
-          rounding = mkOption {
-            type = types.ints.unsigned;
-            default = 10;
-            description = "Corner radius in pixels";
-          };
-          font = mkOption {
-            type = types.str;
-            default = "JetBrainsMono Nerd Font";
-            description = "Font family used in the launcher";
-          };
-          terminal = mkOption {
-            type = types.str;
-            default = "kitty";
-            description = "Terminal used for applications that run in a terminal (called as `terminal -e command`)";
-          };
-          rows = mkOption {
-            type = types.ints.positive;
-            default = 8;
-            description = "Maximum number of results shown";
-          };
-        };
-
         frame = {
           enable = mkEnableOption "the screen frame: vertical bar on the left, rounded border and a dashboard that slides from the top";
           fontSize = mkOption {
@@ -244,11 +215,33 @@
               default = "left";
               description = "Side of the screen the bar is attached to";
             };
+            logo = mkOption {
+              type = types.bool;
+              default = true;
+              description = "Show the NixOS logo at the top of the bar";
+            };
             screens = mkOption {
               type = types.listOf types.str;
               default = [ ];
               example = [ "HDMI-A-1" ];
               description = "Monitors that get the bar (see `hyprctl monitors`). Empty means every screen that has the frame. The other screens keep the border without the bar.";
+            };
+          };
+          launcher = {
+            enable = mkOption {
+              type = types.bool;
+              default = true;
+              description = "Application launcher that slides from the bottom edge (toggle it with the quickshell-launcher command)";
+            };
+            terminal = mkOption {
+              type = types.str;
+              default = "kitty";
+              description = "Terminal used for applications that run in a terminal (called as `terminal -e command`)";
+            };
+            rows = mkOption {
+              type = types.ints.positive;
+              default = 8;
+              description = "Maximum number of results shown";
             };
           };
           screens = screensOption;
@@ -258,7 +251,7 @@
       config = lib.mkIf cfg.enable {
         environment.systemPackages = [ pkgs.quickshell ]
           ++ lib.optional cfg.lock.enable self.packages.${pkgs.stdenv.hostPlatform.system}.lock
-          ++ lib.optional cfg.launcher.enable self.packages.${pkgs.stdenv.hostPlatform.system}.launcher
+          ++ lib.optional (cfg.frame.enable && cfg.frame.launcher.enable) self.packages.${pkgs.stdenv.hostPlatform.system}.launcher
           ++ lib.optional cfg.frame.enable self.packages.${pkgs.stdenv.hostPlatform.system}.dashboard
           ++ lib.optional (cfg.frame.enable && cfg.frame.notifications.enable) self.packages.${pkgs.stdenv.hostPlatform.system}.dnd;
 
@@ -297,11 +290,6 @@
             LOCK_RADIUS = toString cfg.lock.rounding;
             LOCK_FONT = cfg.lock.font;
 
-            LAUNCHER_FONT_SIZE = toString cfg.launcher.fontSize;
-            LAUNCHER_RADIUS = toString cfg.launcher.rounding;
-            LAUNCHER_FONT = cfg.launcher.font;
-            LAUNCHER_TERMINAL = cfg.launcher.terminal;
-            LAUNCHER_ROWS = toString cfg.launcher.rows;
 
             FRAME_FONT_SIZE = toString cfg.frame.fontSize;
             FRAME_THICKNESS = toString cfg.frame.thickness;
@@ -312,7 +300,11 @@
             FRAME_SCREENS = csv cfg.frame.screens;
             FRAME_BAR = if cfg.frame.bar.enable then "1" else "0";
             FRAME_BAR_POSITION = cfg.frame.bar.position;
+            FRAME_BAR_LOGO = if cfg.frame.bar.logo then "1" else "0";
             FRAME_BAR_SCREENS = csv cfg.frame.bar.screens;
+            FRAME_LAUNCHER = if cfg.frame.launcher.enable then "1" else "0";
+            FRAME_LAUNCHER_TERMINAL = cfg.frame.launcher.terminal;
+            FRAME_LAUNCHER_ROWS = toString cfg.frame.launcher.rows;
             FRAME_NOTIFICATIONS = if cfg.frame.notifications.enable then "1" else "0";
             FRAME_NOTIFICATION_TIMEOUT = toString cfg.frame.notifications.timeout;
           };

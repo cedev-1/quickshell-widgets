@@ -8,6 +8,7 @@ Item {
     id: root
 
     property real unit: 1
+    property bool showLogo: true
     property string fontFamily: "JetBrainsMono Nerd Font"
 
     readonly property int activeWorkspace: Hyprland.focusedWorkspace?.id ?? -1
@@ -29,6 +30,7 @@ Item {
     }
 
     Text {
+        visible: root.showLogo
         anchors.top: parent.top
         anchors.topMargin: 14 * root.unit
         anchors.horizontalCenter: parent.horizontalCenter

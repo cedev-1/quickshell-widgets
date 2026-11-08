@@ -17,13 +17,18 @@ Scope {
     property bool gpu: false
     property bool hoverOpen: true
     property bool barEnabled: true
+    property bool barLogo: true
     property string barPosition: "left"
     property var barScreens: []
+    property bool launcherEnabled: true
+    property string launcherTerminal: "kitty"
+    property int launcherRows: 8
     property bool notificationsEnabled: true
     property int notificationTimeout: 5000
     property int maxNotifications: 4
 
     property string dashboardScreen: ""
+    property string launcherScreen: ""
     property bool dashboardByHover: false
     property bool doNotDisturb: false
 
@@ -59,6 +64,22 @@ Scope {
             closeDashboard();
         else
             openDashboard(name, false);
+    }
+
+    function openLauncher(screenName: string): void {
+        launcherScreen = screenName;
+    }
+
+    function closeLauncher(): void {
+        launcherScreen = "";
+    }
+
+    function toggleLauncher(): void {
+        var name = Hyprland.focusedMonitor?.name ?? "";
+        if (launcherScreen === name)
+            closeLauncher();
+        else
+            openLauncher(name);
     }
 
     function clearNotifications(): void {
@@ -97,6 +118,14 @@ Scope {
 
         function closeDashboard(): void {
             root.closeDashboard();
+        }
+
+        function toggleLauncher(): void {
+            root.toggleLauncher();
+        }
+
+        function closeLauncher(): void {
+            root.closeLauncher();
         }
 
         function clearNotifications(): void {
