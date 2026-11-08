@@ -10,7 +10,7 @@ Quickshell components for Hyprland on NixOS, all in one flake. Enable only the o
 
 All components run in a single Quickshell process.
 
-<img width="967" height="712" alt="image" src="https://github.com/user-attachments/assets/b4148b26-4af6-4a5b-9150-6787e07e367c" />
+<img width="2556" height="1439" alt="2026-11-08_20-49" src="https://github.com/user-attachments/assets/4ad4d043-3962-4c70-9b97-c6e6f1054e4d" />
 
 ## Try it
 
@@ -90,6 +90,9 @@ Check it with `systemctl --user status quickshell-widgets`.
 
 ## Lock screen
 
+<img width="2560" height="1440" alt="lock" src="https://github.com/user-attachments/assets/ba4b25a3-f513-4bd9-b379-9cd57cfdb575" />
+
+
 Enabling `lock` installs the `quickshell-lock` command and a `quickshell-lock` PAM service. Bind the command to a key, for example in a Lua Hyprland config:
 
 ```lua
@@ -128,6 +131,8 @@ hl.bind("SUPER + D", hl.dsp.exec_cmd("quickshell-dashboard"))
 
 ### Launcher
 
+<img width="2560" height="1440" alt="lock" src="https://github.com/user-attachments/assets/864a8fda-b6c4-4fd7-97cb-3e5bb5e3eec0" />
+
 The launcher slides from the bottom edge of the focused screen, with the same rounded junctions as the other panels. The search field is at the bottom and the results are above it, the best match closest to the field. Bind the `quickshell-launcher` command, which toggles it, for example to replace rofi in a Lua Hyprland config:
 
 ```lua
@@ -137,6 +142,8 @@ hl.bind("SUPER + R", hl.dsp.exec_cmd("quickshell-launcher"))
 Type to search (name, generic name, comment and keywords), `Up`/`Down` or `Ctrl+K`/`Ctrl+J` (also `Ctrl+P`/`Ctrl+N`) to move, `Enter` to launch and `Esc` to close. Clicking outside also closes it. Applications that run in a terminal are started with `launcher.terminal`.
 
 ### Session menu
+
+<img width="2560" height="1440" alt="lock" src="https://github.com/user-attachments/assets/222c9658-5cef-41c8-a9c6-0d5b320e50e2" />
 
 A panel with lock, logout, sleep, reboot and shutdown buttons slides out of the side opposite to the bar, vertically centered, with the same rounded junctions. Open it with the power button at the bottom of the bar or with the `quickshell-session` command, which toggles it on the focused screen:
 
