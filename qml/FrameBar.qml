@@ -13,6 +13,8 @@ Item {
     property bool showUsage: false
     property string fontFamily: "JetBrainsMono Nerd Font"
 
+    readonly property real usageCenterY: usageButton.y + usageButton.height / 2
+
     signal powerRequested
     signal usageRequested
 
@@ -100,6 +102,8 @@ Item {
     }
 
     Rectangle {
+        id: usageButton
+
         visible: root.showUsage
         anchors.bottom: root.showPower ? powerButton.top : timeColumn.top
         anchors.bottomMargin: 14 * root.unit

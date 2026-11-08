@@ -58,7 +58,12 @@ PanelWindow {
     property real notifHeight: 0
     property real notifDepth: 0
     readonly property real notifBottom: content.height - 90 * unit
-    readonly property real notifTop: notifBottom - notifHeight
+    readonly property real notifOpenTop: notifBottom - notifHeight
+    readonly property real notifProgress: notifWidth > 0 ? Math.max(0, Math.min(1, notifDepth / notifWidth)) : 0
+    readonly property real notifAnchorY: hasBar && controller.usageEnabled ? bar.usageCenterY : notifBottom
+    readonly property real notifEffBottom: notifAnchorY + (notifBottom - notifAnchorY) * notifProgress
+    readonly property real notifEffTop: notifAnchorY + (notifOpenTop - notifAnchorY) * notifProgress
+    readonly property real notifEffHeight: notifEffBottom - notifEffTop
 
     readonly property real holeLeft: leftInset
     readonly property real holeRight: content.width - rightInset
@@ -140,9 +145,9 @@ PanelWindow {
         d += hline(L + R);
         d += arc(R, L, bottom - R, 1);
 
-        if (notifDepth > 0.5 && notifHeight > 1) {
-            var nd = notifDepth, pb = notifBottom, py = notifTop;
-            var nrf = Math.min(R, nd / 2, notifHeight / 2);
+        if (notifDepth > 0.5 && notifEffHeight > 1) {
+            var nd = notifDepth, pb = notifEffBottom, py = notifEffTop;
+            var nrf = Math.min(R, nd / 2, notifEffHeight / 2);
 
             d += " V" + (pb + nrf);
             d += arc(nrf, L + nrf, pb, 1);
@@ -291,6 +296,8 @@ PanelWindow {
         }
 
         FrameBar {
+            id: bar
+
             visible: win.hasBar
             showLogo: win.controller.barLogo
             showUsage: win.controller.usageEnabled
@@ -327,9 +334,9 @@ PanelWindow {
 
         Item {
             x: win.barRight ? win.holeRight - win.notifDepth : win.holeLeft
-            y: win.notifTop
+            y: win.notifEffTop
             width: win.notifDepth
-            height: win.notifHeight
+            height: win.notifEffHeight
             clip: true
             visible: win.notifDepth > 1
 
@@ -339,7 +346,7 @@ PanelWindow {
                 visible: !win.usageVisible
 
                 x: win.barRight ? win.notifPad + (win.notifWidth - win.notifDepth) : win.notifPad - (win.notifWidth - win.notifDepth)
-                y: win.notifPad
+                y: (win.notifOpenTop - win.notifEffTop) + win.notifPad
                 spacing: 8 * win.unit
 
                 Repeater {
@@ -358,7 +365,7 @@ PanelWindow {
                 id: usageLoader
 
                 x: win.barRight ? win.notifPad + (win.notifWidth - win.notifDepth) : win.notifPad - (win.notifWidth - win.notifDepth)
-                y: win.notifPad
+                y: (win.notifOpenTop - win.notifEffTop) + win.notifPad
                 active: win.usageVisible
 
                 sourceComponent: FrameUsage {
@@ -435,7 +442,7 @@ PanelWindow {
         Item { id: cornerTopRight; x: win.holeRight - win.rounding; y: win.edge; width: win.rounding; height: win.rounding }
         Item { id: cornerBottomLeft; x: win.holeLeft; y: win.holeBottom - win.rounding; width: win.rounding; height: win.rounding }
         Item { id: cornerBottomRight; x: win.holeRight - win.rounding; y: win.holeBottom - win.rounding; width: win.rounding; height: win.rounding }
-        Item { id: notifArea; x: win.barRight ? win.holeRight - win.notifDepth : win.holeLeft; y: win.notifTop; width: win.notifDepth; height: win.notifHeight }
+        Item { id: notifArea; x: win.barRight ? win.holeRight - win.notifDepth : win.holeLeft; y: win.notifEffTop; width: win.notifDepth; height: win.notifEffHeight }
         Item { id: launcherArea; x: win.launcherLeft; y: win.holeBottom - win.launcherDepth; width: win.launcherWidth; height: win.launcherDepth + win.edge }
         Item { id: sessionArea; x: win.sessionOnRight ? win.holeRight - win.sessionDepth : win.holeLeft; y: win.sessionTop; width: win.sessionDepth; height: win.sessionHeight }
 
